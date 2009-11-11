@@ -1,0 +1,120 @@
+<?php
+
+/**
+ * @file simpletests for the cd_sunlight module.
+ */
+
+class cdSunlightTest extends DrupalTestCase {
+  /**
+   *
+   * Implementation of get_info() for information
+   */
+  function get_info() {
+    return array(
+      'name' => t('CiviCRM Sunlight Congressional Districts tests'),
+      'desc' => t('Test queuing, dequeing, and data fetching.'),
+      'group' => 'CiviCRM Sunlight Congressional Districts Module',
+    );
+  }
+
+  function setUp() {
+    // Turn CiviCRM geocoding off so that this doesn't fire when we process the queue.
+    $this->drupalVariableSet('cd_sunlight_geocoding_off', FALSE);
+  }
+
+  /**
+   * Create new contact, it should be queued for lookup.
+   * Dequeue and test.
+   * Edit the contact, it should be queued for lookup.
+   * Process the queue, it should have the correct CD retrieved.
+   */
+  function testCDSunlight() {
+
+    // Test that the module is setup.
+    $requirements = cd_sunlight_requirements('runtime');
+    foreach ($requirements as $requirement) {
+      if ($requirement['severity'] == REQUIREMENT_ERROR) {
+        $this->assertFalse(TRUE, "The module is not setup properly.");
+        return;
+      }
+    }
+
+    // Test that the queue is empty.
+    $count = $requirements['cd_sunlight_count']['count'];
+    if ($count != 0) {
+      $this->assertFalse(TRUE, "There are $count contacts in the cron queue.  ".
+        "The queue needs to be empty to run these simpletests.");
+      return;
+    }
+
+    // Setup CiviCRM
+    if (!function_exists('civicrm_initialize') || !civicrm_initialize() || (include('api/v2/Contact.php') === FALSE)) {
+      $this->assertFalse(TRUE, 'CiviCRM does not appear to be setup correctly.'.
+        var_export($params, TRUE) . var_export($contact, TRUE));
+      return;
+    }
+
+    // See if we can create a contact.
+    require_once('api/v2/Contact.php');
+    $contact = array(
+      'first_name' => 'Simpletest test',
+      'last_name' => 'Simpletest test',
+      'email' => 'simpletest@example.org',
+      'contact_type' => 'Individual',
+      'dupe_check' => FALSE,
+      'postal_code' => '10006',
+    );
+    $result = civicrm_contact_add($contact);
+    if (civicrm_error($result)) {
+      $this->assertFalse(TRUE, 'A CiviCRM contact could not be created.  This may happen when you '.
+        'have non-standard required fields or other restrictions on contacts.'.
+        var_export($result, TRUE) . var_export($contact, TRUE));
+      return;
+    }
+    $this->assertFalse(FALSE, 'A CiviCRM contact created simpletest@example.org');
+    
+    // Test that it was enqueued.
+    $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when created');
+
+    // Process and test.
+    _cd_sunlight_process_queue();
+    $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed');
+    $params = array(
+      'contact_id' => $contact['contact_id'],
+      'return.'. CD_SUNLIGHT_CIVICRM_CD => TRUE,
+      'return.contact_type' => TRUE,
+    );
+    $contact = civicrm_contact_get($params);
+    $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY8', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
+
+    // Edit the contact, it should be re-enqueued.
+    $contact['postal_code'] = '12345';
+    $result = civicrm_contact_add($contact);
+    if (civicrm_error($contact)) {
+      $this->assertFalse(TRUE, 'The CiviCRM contact could not be edited.  '.
+        var_export($result, TRUE) . var_export($contact, TRUE));
+      return;
+    }
+    $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
+
+    // Process the queue, our contact should be processed.
+    _cd_sunlight_process_queue();
+    $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
+    $contact = civicrm_contact_get($params);
+    $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY21', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
+
+    // Cleanup. Delete the contact.
+    civicrm_contact_delete($contact);
+
+  }
+
+  /**
+   * Is the contact ID in the cron queue?
+   *
+   * @param int $contact_id
+   */
+  function _checkQueue($contact_id) {
+    return db_result(db_query('SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d', $contact_id));
+  }
+
+}

@@ -1,0 +1,155 @@
+<?php
+
+/**
+ *  @file Install/Updates for cd_sunlight.
+ */
+
+/**
+ * Implementation of hook_install().
+ * 
+ * @return none
+ */
+function cd_sunlight_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      db_query("CREATE TABLE IF NOT EXISTS {cd_sunlight_cron} (
+          contact_id int( 10 ) UNSIGNED DEFAULT NULL,
+          PRIMARY KEY ( contact_id )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+      ");
+      // NOTE: Keep the list of fields synched with the list in 
+      // _cd_sunlight_legislator_filter_fields().
+      db_query("CREATE TABLE IF NOT EXISTS {cd_sunlight_legislators} (
+          legislator_id INT( 10 ) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+          last_update_time INT( 11 ) UNSIGNED NOT NULL DEFAULT 0,
+          firstname VARCHAR( 64 ) NULL ,
+          middlename VARCHAR( 64 ) NULL ,
+          lastname VARCHAR( 64 ) NULL ,
+          name_suffix VARCHAR( 8 ) NULL ,
+          nickname VARCHAR( 64 ) NULL ,
+          title ENUM( 'Sen', 'Rep' ) NULL ,
+          party ENUM( 'D', 'R', 'I' ) NULL,
+          state CHAR( 2 ) NOT NULL DEFAULT '__',
+          number TINYINT( 2 ) UNSIGNED NULL,
+          in_office TINYINT( 1 ) NOT NULL DEFAULT '1',
+          gender ENUM( 'M', 'F' ) NULL ,
+          phone VARCHAR( 32 ) NULL ,
+          fax VARCHAR( 32 ) NULL ,
+          website VARCHAR( 64 ) NULL ,
+          webform VARCHAR( 64 ) NULL ,
+          email VARCHAR( 64 ) NULL ,
+          congress_office VARCHAR( 256 ) NULL ,
+          bioguide_id VARCHAR( 16 ) NULL,
+          votesmart_id VARCHAR( 16 ) NULL,
+          fec_id VARCHAR( 16 ) NULL,
+          govtrack_id VARCHAR( 16 ) NULL,
+          crp_id VARCHAR( 16 ) NULL,
+          eventful_id VARCHAR( 32 ) NULL,
+          congresspedia_url VARCHAR( 64 ) NULL,
+          twitter_id VARCHAR( 16 ) NULL,
+          youtube_url VARCHAR( 64 ) NULL,
+          INDEX {cd_sunlight_legislators}_party_idx ( party ),
+          INDEX {cd_sunlight_legislators}_state_number_idx ( state , number ),
+          INDEX {cd_sunlight_legislators}_title_idx ( title )
+        ) ENGINE = InnoDB CHARSET = utf8; 
+      ");
+      // NOTE: Keep the list of fields synched with the list in 
+      // _cd_sunlight_legislator_filter_fields().
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ * 
+ * @return none
+ */
+function cd_sunlight_uninstall() {
+  db_query('DROP TABLE {cd_sunlight_legislators}, {cd_sunlight_cron}');
+}
+
+/**
+ * Install tables if they don't exist.
+ */
+function cd_sunlight_update_1() {
+  $ret = array();
+  if (!db_table_exists('cd_sunlight_cron')) {
+    cd_sunlight_install();
+    $ret[] = array('success' => TRUE, 'query' => 'Created cd_sunlight tables');
+  }
+  return $ret;
+}
+
+/**
+ * Check that all our existing data validates.
+ */
+function cd_sunlight_update_2() {
+
+  // Multi-part update
+  static $limit = 50;
+  if (!isset($_SESSION['cd_sunlight_update_2_contact_id'])) {
+    $_SESSION['cd_sunlight_update_2_contact_id'] = 0;
+    db_set_active('civicrm');
+    $_SESSION['cd_sunlight_update_2_max'] = db_result(
+      db_query('SELECT MAX(entity_id) FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE)
+    );
+    db_set_active();
+  }
+
+  // Iterate through the contacts.
+  db_set_active('civicrm');
+  $res = db_query(
+    'SELECT entity_id as contact_id, '. 
+    CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS '. CD_SUNLIGHT_CIVICRM_CD .', '.
+    CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS '. CD_SUNLIGHT_CIVICRM_CD_OVERRIDE .
+    ' FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE . 
+    ' WHERE ('. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NOT NULL '.
+    '  OR '.  CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' IS NOT NULL) '.
+    '  AND entity_id > '. $_SESSION['cd_sunlight_update_2_contact_id'] .
+    ' ORDER BY entity_id '.
+    ' LIMIT 0, '. $limit
+  );
+  db_set_active();
+  while ($contact = db_fetch_array($res)) {
+    cd_sunlight_validate_civicrm_data($contact);
+    $_SESSION['cd_sunlight_update_2_contact_id'] = $contact['contact_id'];
+  }
+  
+  // Are we finished?
+  if ($_SESSION['cd_sunlight_update_2_contact_id'] == $_SESSION['cd_sunlight_update_2_max']) {
+    unset($_SESSION['cd_sunlight_update_2_contact_id']);
+    unset($_SESSION['cd_sunlight_update_2_max']);
+    return array();
+  }
+  return array(
+    '#finished' => $_SESSION['cd_sunlight_update_2_contact_id'] / $_SESSION['cd_sunlight_update_2_max']
+  );
+}
+
+/**
+ * Change number column to district.
+ */
+function cd_sunlight_update_3() {
+  $ret = array();
+  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} CHANGE number district TINYINT(2) UNSIGNED NULL");
+  return $ret;
+}
+
+/**
+ * Add YouTube URL.
+ */
+function cd_sunlight_update_4() {
+  $ret = array();
+  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} ADD youtube_url VARCHAR(64) NULL");
+  return $ret;
+}
+
+/**
+ * Change number column to district.
+ */
+function cd_sunlight_update_5() {
+  $ret = array();
+  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} CHANGE district number TINYINT(2) UNSIGNED NULL");
+  return $ret;
+}
