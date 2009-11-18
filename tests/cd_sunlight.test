@@ -48,7 +48,7 @@ class cdSunlightTest extends DrupalTestCase {
     }
 
     // Setup CiviCRM
-    if (!function_exists('civicrm_initialize') || !civicrm_initialize() || (include('api/v2/Contact.php') === FALSE)) {
+    if (!function_exists('civicrm_initialize') || !civicrm_initialize() || (include('./api/v2/Contact.php') === FALSE)) {
       $this->assertFalse(TRUE, 'CiviCRM does not appear to be setup correctly.'.
         var_export($params, TRUE) . var_export($contact, TRUE));
       return;

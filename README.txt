@@ -36,14 +36,14 @@ cd_sunlight_contact_dequeue($contact_id)
 cd_sunlight_contact_get_cd($contact_id) 
 cd_sunlight_contact_get_state($contact_id) 
 cd_sunlight_contact_get_numnber($contact_id)
+cd_sunlight_contacts_geocode($number_of_contacts = 300)
 cd_sunlight_user_get_cd($uid) 
-cd_sunlight_user_get_state($contact_id) 
-cd_sunlight_user_get_number($contact_id) 
+cd_sunlight_user_get_state($uid)
+cd_sunlight_user_get_number($uid)
 cd_sunlight_cd_load($cd, $return_properties = array('legislators')) 
 cd_sunlight_cd_all() 
 cd_sunlight_legislators_get($params = array(), $order_by = array('state' => 'ASC', 'number' => 'ASC', 'lastname' => 'ASC'))
 cd_sunlight_validate_civicrm_data($contact) 
-cd_sunlight_geocode_contacts($number_of_contacts = 300) 
 
 
 * DEVELOPED BY *
