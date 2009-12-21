@@ -2,72 +2,221 @@
 // $Id$
 
 /**
- *  @file Install/Updates for cd_sunlight.
+ * @file
+ * Install/Updates for cd_sunlight.
  */
 
 /**
+ * Implementation of hook_schema().
+ */
+function cd_sunlight_schema() {
+  $schema['cd_sunlight_cron'] = array(
+    'description' => t('Contains contact_ids that will be sent for CD Lookup on the next cron run.'),
+    'fields' => array(
+      'contact_id' => array(
+        'description' => t('CiviCRM Contact ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('contact_id'),
+  );
+
+  $schema['cd_sunlight_legislators'] = array(
+    'description' => t('The current legislators as returned by the Sunlight API'),
+    'fields' => array(
+      'legislator_id' => array(
+        'description' => t('Autoincrementing primary key.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'last_update_time' => array(
+        'description' => t('When this row was last updated.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'firstname' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'middlename' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'lastname' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'name_suffix' => array(
+        'type' => 'varchar',
+        'length' => '8',
+        'not null' => FALSE,
+      ),
+      'nickname' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'title' => array(
+        'description' => t('Either "Sen" or "Rep"'),
+        'type' => 'varchar',
+        'length' => '3',
+        'not null' => FALSE,
+      ),
+      'party' => array(
+        'description' => t('Either D, R, or I'),
+        'type' => 'varchar',
+        'length' => '1',
+        'not null' => FALSE,
+      ),
+      'state' => array(
+        'type' => 'varchar',
+        'length' => '2',
+        'not null' => TRUE,
+        'default' => '__',
+      ),
+      'district' => array(
+        'description' => t('Only for Reps.  The CD that they legislate.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'size' => 'tiny',
+        'not null' => FALSE,
+      ),
+      'in_office' => array(
+        'description' => t('Is the legislator current.  Always 1 for our purposes.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 1,
+      ),
+      'gender' => array(
+        'type' => 'varchar',
+        'length' => '1',
+        'not null' => FALSE,
+      ),
+      'phone' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+      'fax' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+      'website' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'webform' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'email' => array(
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'congress_office' => array(
+        'type' => 'varchar',
+        'length' => '256',
+        'not null' => FALSE,
+      ),
+      'bioguide_id' => array(
+        'description' => t('http://bioguide.congress.gov/'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'votesmart_id' => array(
+        'description' => t('http://votesmart.org/'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'fec_id' => array(
+        'description' => t('TODO'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'govtrack_id' => array(
+        'description' => t('http://govtrack.us/'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'crp_id' => array(
+        'description' => t('http://www.opensecrets.org/'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'eventful_id' => array(
+        'description' => t('DEPRICATED'),
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+      ),
+      'congresspedia_url' => array(
+        'description' => t('http://www.opencongress.org/'),
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+      'twitter_id' => array(
+        'description' => t('http://twitter.com/'),
+        'type' => 'varchar',
+        'length' => '16',
+        'not null' => FALSE,
+      ),
+      'youtube_url' => array(
+        'description' => t('http://youtube.com'),
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('legislator_id'),
+    'indexes' => array(
+      'cd_sunlight_legislators_party_idx' => array('party'),
+      'cd_sunlight_legislators_state_district_idx' => array('state', 'district'),
+      'cd_sunlight_legislators_title_idx' => array('title'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
  * Implementation of hook_install().
- * 
+ *
  * @return none
  */
 function cd_sunlight_install() {
-  switch ($GLOBALS['db_type']) {
-    case 'mysqli':
-    case 'mysql':
-      db_query("CREATE TABLE IF NOT EXISTS {cd_sunlight_cron} (
-          contact_id int( 10 ) UNSIGNED DEFAULT NULL,
-          PRIMARY KEY ( contact_id )
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-      ");
-      // NOTE: Keep the list of fields synched with the list in 
-      // _cd_sunlight_legislator_filter_fields().
-      db_query("CREATE TABLE IF NOT EXISTS {cd_sunlight_legislators} (
-          legislator_id INT( 10 ) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-          last_update_time INT( 11 ) UNSIGNED NOT NULL DEFAULT 0,
-          firstname VARCHAR( 64 ) NULL ,
-          middlename VARCHAR( 64 ) NULL ,
-          lastname VARCHAR( 64 ) NULL ,
-          name_suffix VARCHAR( 8 ) NULL ,
-          nickname VARCHAR( 64 ) NULL ,
-          title ENUM( 'Sen', 'Rep' ) NULL ,
-          party ENUM( 'D', 'R', 'I' ) NULL,
-          state CHAR( 2 ) NOT NULL DEFAULT '__',
-          number TINYINT( 2 ) UNSIGNED NULL,
-          in_office TINYINT( 1 ) NOT NULL DEFAULT '1',
-          gender ENUM( 'M', 'F' ) NULL ,
-          phone VARCHAR( 32 ) NULL ,
-          fax VARCHAR( 32 ) NULL ,
-          website VARCHAR( 64 ) NULL ,
-          webform VARCHAR( 64 ) NULL ,
-          email VARCHAR( 64 ) NULL ,
-          congress_office VARCHAR( 256 ) NULL ,
-          bioguide_id VARCHAR( 16 ) NULL,
-          votesmart_id VARCHAR( 16 ) NULL,
-          fec_id VARCHAR( 16 ) NULL,
-          govtrack_id VARCHAR( 16 ) NULL,
-          crp_id VARCHAR( 16 ) NULL,
-          eventful_id VARCHAR( 32 ) NULL,
-          congresspedia_url VARCHAR( 64 ) NULL,
-          twitter_id VARCHAR( 16 ) NULL,
-          youtube_url VARCHAR( 64 ) NULL,
-          INDEX {cd_sunlight_legislators}_party_idx ( party ),
-          INDEX {cd_sunlight_legislators}_state_number_idx ( state , number ),
-          INDEX {cd_sunlight_legislators}_title_idx ( title )
-        ) ENGINE = InnoDB CHARSET = utf8; 
-      ");
-      // NOTE: Keep the list of fields synched with the list in 
-      // _cd_sunlight_legislator_filter_fields().
-      break;
-  }
+  // Create tables.
+  drupal_install_schema('cd_sunlight');
 }
 
 /**
  * Implementation of hook_uninstall().
- * 
+ *
  * @return none
  */
 function cd_sunlight_uninstall() {
-  db_query('DROP TABLE {cd_sunlight_legislators}, {cd_sunlight_cron}');
+  // Remove tables.
+  drupal_uninstall_schema('cd_sunlight');
+
 }
 
 /**
@@ -101,10 +250,10 @@ function cd_sunlight_update_2() {
   // Iterate through the contacts.
   db_set_active('civicrm');
   $res = db_query(
-    'SELECT entity_id as contact_id, '. 
+    'SELECT entity_id as contact_id, '.
     CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS '. CD_SUNLIGHT_CIVICRM_CD .', '.
     CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS '. CD_SUNLIGHT_CIVICRM_CD_OVERRIDE .
-    ' FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE . 
+    ' FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .
     ' WHERE ('. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NOT NULL '.
     '  OR '.  CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' IS NOT NULL) '.
     '  AND entity_id > '. $_SESSION['cd_sunlight_update_2_contact_id'] .
@@ -116,7 +265,7 @@ function cd_sunlight_update_2() {
     cd_sunlight_validate_civicrm_data($contact);
     $_SESSION['cd_sunlight_update_2_contact_id'] = $contact['contact_id'];
   }
-  
+
   // Are we finished?
   if ($_SESSION['cd_sunlight_update_2_contact_id'] == $_SESSION['cd_sunlight_update_2_max']) {
     unset($_SESSION['cd_sunlight_update_2_contact_id']);
@@ -129,28 +278,17 @@ function cd_sunlight_update_2() {
 }
 
 /**
- * Change number column to district.
+ * Removed.
  */
 function cd_sunlight_update_3() {
   $ret = array();
-  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} CHANGE number district TINYINT(2) UNSIGNED NULL");
   return $ret;
 }
 
 /**
- * Add YouTube URL.
+ * Removed.
  */
 function cd_sunlight_update_4() {
   $ret = array();
-  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} ADD youtube_url VARCHAR(64) NULL");
-  return $ret;
-}
-
-/**
- * Change number column to district.
- */
-function cd_sunlight_update_5() {
-  $ret = array();
-  $ret[] = update_sql("ALTER TABLE {cd_sunlight_legislators} CHANGE district number TINYINT(2) UNSIGNED NULL");
   return $ret;
 }

@@ -1,3 +1,5 @@
 ; $Id$
 name = CiviCRM Congressional District
 description = Integrates with the Sunlight service to lookup Congressional Districts when a CiviCRM contact changes.
+dependencies[] = civicrm
+core = 6.x
