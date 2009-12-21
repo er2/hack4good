@@ -1,0 +1,5 @@
+; $Id$ 
+name = Congress
+description = Shows the current members of congress
+core = 6.x
+dependencies[] = cd_sunlight

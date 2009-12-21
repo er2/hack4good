@@ -564,7 +564,7 @@ function cd_sunlight_contact_get_cd($contact_id) {
  */
 function cd_sunlight_contact_get_state($contact_id) {
   $cd = cd_sunlight_contact_get_cd($contact_id);
-  return _cd_sunlight_cd_parse_state($cd);
+  return cd_sunlight_cd_parse_state($cd);
 }
 
 /**
@@ -576,7 +576,7 @@ function cd_sunlight_contact_get_state($contact_id) {
  */
 function cd_sunlight_contact_get_district($contact_id) {
   $cd = cd_sunlight_contact_get_cd($contact_id);
-  return _cd_sunlight_cd_parse_district($cd);
+  return cd_sunlight_cd_parse_district($cd);
 }
 
 /**
@@ -666,8 +666,8 @@ function cd_sunlight_cd_load($cd, $return_properties = array('legislators')) {
   }
 
   $district = array(
-    'state' => _cd_sunlight_cd_parse_state($cd),
-    'district' => _cd_sunlight_cd_parse_district($cd),
+    'state' => cd_sunlight_cd_parse_state($cd),
+    'district' => cd_sunlight_cd_parse_district($cd),
     'cd' => $cd,
   );
 
@@ -779,6 +779,31 @@ function cd_sunlight_legislators_get($params = array(), $order_by = array('state
   }
 
   return $legislators;
+}
+
+/**
+ * Given the CD, extract the characters for state
+ *
+ * @param string $cd
+ *  ex. 'NY17'.
+ * @return string
+ *  ex. 'NY'
+ */
+function cd_sunlight_cd_parse_state($cd) {
+  return drupal_substr($cd, 0, 2);
+}
+
+/**
+ * Given the CD, extract the characters for district
+ *
+ * @param string $cd
+ *  ex. 'NY17'.
+ * @return int
+ *  ex. 17
+ */
+function cd_sunlight_cd_parse_district($cd) {
+  // Note that we can't use substr($cd, -2) because the district might only be one digit.
+  return drupal_substr($cd, 2);
 }
 
 /**
@@ -960,8 +985,8 @@ function _cd_sunlight_validate_cd(&$cd) {
   $cd = preg_replace("/[^a-zA-Z0-9]/", '', $cd);
 
   // We have to split things up so that state gets forced to be upper case.
-  $state = _cd_sunlight_cd_parse_state($cd);
-  $district = _cd_sunlight_cd_parse_district($cd);
+  $state = cd_sunlight_cd_parse_state($cd);
+  $district = cd_sunlight_cd_parse_district($cd);
 
   if (_cd_sunlight_validate_state($state) === FALSE) {
     return FALSE;
@@ -1028,31 +1053,6 @@ function _cd_sunlight_validate_district($state, &$district) {
   $district = ltrim($district, '0');
   $district_len = drupal_strlen($district);
   return ctype_digit((string)$district) && ($district_len === 2 || $district_len === 1);
-}
-
-/**
- * Given the CD, extract the characters for state
- *
- * @param string $cd
- *  ex. 'NY17'.
- * @return string
- *  ex. 'NY'
- */
-function _cd_sunlight_cd_parse_state($cd) {
-  return drupal_substr($cd, 0, 2);
-}
-
-/**
- * Given the CD, extract the characters for district
- *
- * @param string $cd
- *  ex. 'NY17'.
- * @return int
- *  ex. 17
- */
-function _cd_sunlight_cd_parse_district($cd) {
-  // Note that we can't use substr($cd, -2) because the district might only be one digit.
-  return drupal_substr($cd, 2);
 }
 
 /**
@@ -1225,8 +1225,8 @@ function _cd_sunlight_zone_update($zone, $name) {
       );
       return FALSE;
     }
-    $state = _cd_sunlight_cd_parse_state($name);
-    $district = _cd_sunlight_cd_parse_district($name);
+    $state = cd_sunlight_cd_parse_state($name);
+    $district = cd_sunlight_cd_parse_district($name);
   }
   elseif ($zone == 'state') {
     if (!_cd_sunlight_validate_state($name)) {
@@ -1873,8 +1873,8 @@ function _cd_sunlight_cd_get_legislators($cd) {
   if (!_cd_sunlight_validate_cd($cd) || empty($cd)) {
     return $legislators;
   }
-  $state = _cd_sunlight_cd_parse_state($cd);
-  $district = _cd_sunlight_cd_parse_district($cd);
+  $state = cd_sunlight_cd_parse_state($cd);
+  $district = cd_sunlight_cd_parse_district($cd);
 
   // Get Representatives.  Note that we must do Reps and Sens separate since Reps require a
   // district and Sens don't.

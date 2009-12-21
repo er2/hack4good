@@ -43,7 +43,13 @@ cd_sunlight_user_get_number($uid)
 cd_sunlight_cd_load($cd, $return_properties = array('legislators')) 
 cd_sunlight_cd_all() 
 cd_sunlight_legislators_get($params = array(), $order_by = array('state' => 'ASC', 'number' => 'ASC', 'lastname' => 'ASC'))
-cd_sunlight_validate_civicrm_data($contact) 
+cd_sunlight_validate_civicrm_data($contact)
+cd_sunlight_cd_parse_state($cd)
+cd_sunlight_cd_parse_district($cd)
+
+* CONGRESS MODULE *
+The congress module is an example implementation of the API.  It provides a few blocks and a user
+tab showing members of congress. 
 
 
 * DEVELOPED BY *

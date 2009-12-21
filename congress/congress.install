@@ -1,0 +1,32 @@
+<?php
+// $Id$ 
+
+/**
+ * @file
+ * Install file for Congress module.
+ */
+
+/**
+ * Implementation of hook_install() 
+ */
+function congress_install() {
+
+}
+
+/**
+ * Implementation of hook_uninstall() 
+ */
+function congress_uninstall() {
+  variable_del('congress_block1_senate');
+  variable_del('congress_block1_house');
+  variable_del('congress_block2_senate');
+  variable_del('congress_block2_house');
+  variable_del('congress_block_anonymous_message');
+  variable_del('congress_block_no_cd_message');
+  variable_del('congress_block_1_display_fields');
+  variable_del('congress_block_2_display_fields');
+  variable_del('congress_block_own_members_of_congress_display_fields');
+  variable_del('congress_block_1_more_link');
+  variable_del('congress_block_2_more_link');
+  variable_del('congress_block_own_members_of_congress_more_link');
+}

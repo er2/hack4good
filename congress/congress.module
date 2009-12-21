@@ -1,0 +1,498 @@
+<?php
+// $Id$ 
+
+/**
+ * @file
+ * Shows the current members of congress.
+ */
+
+/**
+ * Implements hook_perm().
+ */
+function congress_perm() {
+  return array(
+    'view congress members'
+  );
+}
+
+
+/**
+ * Menu access callback for congress tab.
+ *
+ * @param object $account
+ * @return boolean
+ */
+function congress_tab_access($account) {
+  global $user;
+  return $account &&
+    $account->uid &&
+    ($user->uid == $account->uid || user_access('administer users')) &&
+    user_access('view congress members');
+}
+
+/**
+ *  Implementation of hook_menu().
+ */
+function congress_menu() {
+  $items = array();
+  $items['congress'] = array(
+    'title' => 'Congressional Districts',
+    'description' => 'View Congressional Districts',
+    'page callback' => 'congress_districts',
+    'access arguments' => array('view congress members'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+  $items['user/%user/congress'] = array(
+    'title' => 'Congress',
+    'page callback' => 'congress_district_view',
+    'page arguments' => array(1),
+    'access callback' => 'congress_tab_access',
+    'access arguments' => array(1),
+    'weight' => 1,
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function congress_block($op = 'list', $delta = 0, $edit = array()) {
+  global $user;
+  if ($op == 'list') {
+    $blocks[0] = array(
+      'info' => t('Congress: congress members #1'),
+      'cache' => BLOCK_CACHE_GLOBAL
+    );
+    $blocks[1] = array(
+      'info' => t('Congress: congress members #2'),
+      'cache' => BLOCK_CACHE_GLOBAL
+    );
+    $blocks['own_members_of_congress'] = array(
+      'info' => t('Congress: own members of congress'),
+      'cache' => BLOCK_CACHE_PER_USER
+    );
+    return $blocks;
+  }
+  elseif ($op == 'configure') {
+    return _congress_block_configure($delta);
+  }
+  elseif ($op == 'save') {
+    _congress_block_save($delta, $edit);
+  }
+  elseif ($op == 'view') {
+    return _congress_block_view($delta);
+  }
+
+}
+
+/**
+ * Form for block configuration.  
+ *
+ * @param string $delta
+ *  The block ID.
+ * @return array
+ *  FAPI form
+ */
+function _congress_block_configure($delta) {
+  if (is_numeric($delta)) {
+
+    // Get a list of all congress members.
+    $sens = cd_sunlight_legislators_get(array('title' => 'Sen'));
+    $reps = cd_sunlight_legislators_get(array('title' => 'Rep'));
+    $rep_options = $sen_options = array();
+    foreach ($sens as $legislator) {
+      $sen_options[$legislator['legislator_id']] = $legislator['state'] .
+        ' ' . $legislator['lastname'] . ', ' . $legislator['firstname'];
+    }
+    foreach ($reps as $legislator) {
+      $rep_options[$legislator['legislator_id']] = $legislator['cd'] .
+        ' ' . $legislator['lastname'] . ', ' . $legislator['firstname'];
+    }
+    $form['senate'] = array(
+      '#type' => 'select',
+      '#multiple' => TRUE,
+      '#title' => t('Show these members of the senate'),
+      '#default_value' => variable_get('congress_block_' . $delta . '_senate', array()),
+      '#options' => $sen_options,
+    );
+    $form['house'] = array(
+      '#type' => 'select',
+      '#multiple' => TRUE,
+      '#title' => t('Show these members of the house'),
+      '#default_value' => variable_get('congress_block_' . $delta . '_house', array()),
+      '#options' => $rep_options,
+    );
+  }
+  elseif ($delta == 'own_members_of_congress') {
+    $form['anonymous_message'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Message to show for anonymous users'),
+      '#default_value' => variable_get('congress_block_anonymous_message', ''),
+      '#description' => t('We cannot determine the CD of anonymous users.  You may optionally ' .
+        'enter text that will be displayed instead of the members of congress. '),
+    );
+    $form['no_cd_message'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Message to show for users whose CD could not be determined.'),
+      '#default_value' => variable_get('congress_block_no_cd_message', ''),
+    );
+  }
+  $fields = array(
+    'name' => 'Name',
+    'nickname' => 'Nickname*',
+    'photo' => 'Photo*',
+    'congress_office' => 'Office address',
+    'phone' => 'Phone',
+    'fax' => 'Fax*',
+    'email' => 'Email*',
+    'website' => 'Website',
+    'webform' => 'Contact webform',
+    'bioguide_id' => 'BioGuide page',
+    'votesmart_id' => 'VoteSmart page',
+    'govtrack_id' => 'Govtrack page',
+    'crp_id' => 'OpenSecrets page',
+    'eventful_id' => 'eventful page*',
+    'congresspedia_url' => 'OpenCongress page',
+    'twitter' => 'Twitter page*',
+    'youtube_url' => 'YouTube page*',
+  );
+  $form['display_fields'] = array(
+    '#type' => 'select',
+    '#multiple' => TRUE,
+    '#title' => t('Display the following data about each member of congress'),
+    '#default_value' => variable_get('congress_block_' . $delta . '_display_fields', array()),
+    '#options' => $fields,
+    '#description' => '* This field may be empty for some members of congress.',
+  );
+  $more_link_title = t('Show a <a href="!more_url">more</a> link to users with the ' .
+    '<a href="!permissions_link">view congress members</a> permission.',
+    array('!more_url' => url('congress/all'), '!permissions_link' => url('admin/user/permissions', array('fragment' => 'module-congress'))));
+  $form['more_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => $more_link_title,
+    '#default_value' => variable_get('congress_block_' . $delta . '_more_link', FALSE),
+  );
+  return $form;
+}
+
+/**
+ * Saves the block configuration.
+ * @param string $delta
+ *  The block ID.
+ * @param array $edit
+ *  The block configuration form results.
+ */
+function _congress_block_save($delta, $edit) {
+  if (is_numeric($delta)) {
+    variable_set('congress_block_' . $delta . '_senate', $edit['senate']);
+    variable_set('congress_block_' . $delta . '_house', $edit['house']);
+  }
+  elseif ($delta == 'own_members_of_congress') {
+    variable_set('congress_block_anonymous_message', $edit['anonymous_message']);
+    variable_set('congress_block_no_cd_message', $edit['no_cd_message']);
+  }
+  variable_set('congress_block_' . $delta . '_display_fields', $edit['display_fields']);
+  variable_set('congress_block_' . $delta . '_more_link', $edit['more_link']);
+}
+
+/**
+ * Shows the block.
+ * @param string $delta
+ *  The block ID.
+ * @return mixed
+ *  A block array if it there is something to show.
+ */
+function _congress_block_view($delta) {
+  global $user;
+  $output = '';
+  $legislators = array();
+  if (is_numeric($delta)) {
+    $legislator_ids = variable_get('congress_block_' . $delta . '_senate', array());
+    $legislator_ids += variable_get('congress_block_' . $delta . '_house', array());
+    foreach ($legislator_ids as $id) {
+      $legislators += cd_sunlight_legislators_get(array('legislator_id' => $id));
+    }
+  }
+  elseif ($delta == 'own_members_of_congress') {
+    if (!$user->uid) {
+      $output = filter_xss(variable_get('congress_block_anonymous_message', ''));
+    }
+    else {
+      $cd = cd_sunlight_user_get_cd($user->uid);
+      if (empty($cd)) {
+        $output = filter_xss(variable_get('congress_block_no_cd_message', ''));
+      }
+      else {
+        $district = cd_sunlight_cd_load($cd);
+        $legislators = $district['legislators'];
+      }
+    }
+  }
+  $display_fields = variable_get('congress_block_' . $delta . '_display_fields', array());
+  foreach ($legislators as $legislator) {
+    $output .= theme('congress_legislator', $legislator, $display_fields);
+  }
+  if ($output) {
+    if (variable_get('congress_block_' . $delta . '_more_link', FALSE) && user_access('view congress members')) {
+      $output .= '<p>'. l('View more districts', 'congress/all') .'</p>';
+    }
+    $block = array(
+      'subject' => '',
+      'content' => $output,
+    );
+    return $block;
+  }
+}
+
+/**
+ * Show a CD's members of congress.
+ */
+function congress_district_view($account, $cd = NULL) {
+
+  // Sanity checking.
+  if (!user_access('view congress members')) {
+    return drupal_access_denied();
+  }
+
+  $contact = array();
+  if (!$cd) {
+    $cd = cd_sunlight_user_get_cd($account->uid);
+    require_once('api/v2/Contact.php');
+    require_once('api/UFGroup.php');
+    $contact_id = crm_uf_get_match_id($account->uid);
+    if ($contact_id) {
+      $search_parameters = array(
+        'contact_id' => $contact_id,
+        'return.city' => TRUE,
+        'return.state_province' => TRUE,
+        'return.postal_code' => TRUE,
+        'return.postal_code_suffix' => TRUE,
+      );
+      // TODO: use the CiviCRM API for this one.
+      $contact = civicrm_contact_get($search_parameters);
+      if (civicrm_error($contact)) {
+        $contact = NULL;
+      }
+    }
+  }
+
+  // Load district.
+  $district = cd_sunlight_cd_load($cd, array('legislators'));
+  if (empty($district)) {
+    return drupal_not_found();
+  }
+
+  // Display content.
+  $output = theme('congress_district', $district, $contact);
+
+  return $output;
+}
+
+/**
+ * List all districts, with a count of users in that district.
+ */
+function congress_districts($cd = NULL) {
+
+  // Show the district if we're asking for a specific one.
+  if (!empty($cd) && $cd != 'all') {
+    global $user;
+    return congress_district_view($user, $cd);
+  }
+
+  $pager_element = 0;
+  $page = isset($_GET['page']) ? $_GET['page'] : '';
+  $cache_key = 'congress_all_districts:'. $page;
+
+  $cache = cache_get($cache_key);
+  if (empty($cache->data) || ($cache->expire < $_SERVER['REQUEST_TIME'])) {
+
+    // Build the list of districts.
+    // TODO: Would be nice if this could be an API function in cd_sunlight.  But then we'd need
+    // to do a pager with no-SQL data.  Which I'm pretty sure is doable.
+    db_set_active('civicrm');
+    $sql = 'SELECT * FROM ('.
+        'SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS cd, COUNT(*) as users '.
+        'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
+        'INNER JOIN civicrm_uf_match u '.
+          'ON c.entity_id = u.contact_id '.
+        'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .
+      ') AS cds '.
+      'ORDER BY SUBSTR(cd, 1, 2), CAST(SUBSTR(cd, 3) AS UNSIGNED)';
+    $sql_count = 'SELECT COUNT(*) FROM ('.
+        'SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
+        'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
+        'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
+      ') districts';
+    $res = pager_query($sql, 50, $pager_element, $sql_count);
+    db_set_active();
+
+    // Build the table.
+    $header = array('State', 'District', 'Users');
+    $rows = array();
+    while ($cd = db_fetch_array($res)) {
+      if (empty($cd['cd'])) {
+        continue;
+      }
+      $state = cd_sunlight_cd_parse_state($cd['cd']);
+      $district = cd_sunlight_cd_parse_district($cd['cd']);
+      $rows[] = array(
+        $state,
+        l($district, 'congress/'. $cd['cd']),
+        $cd['users']
+      );
+    }
+    $output = theme('table', $header, $rows);
+    $output .= theme('pager', NULL, 50, $pager_element);
+    cache_set($cache_key, $output, 'cache', $_SERVER['REQUEST_TIME'] + 60 * 60 * 24);
+  }
+  else {
+    $output = $cache->data;
+  }
+  return $output;
+}
+
+/**
+ *  Implements hook_theme().
+ */
+function congress_theme($existing, $type, $theme, $path) {
+  $items = array();
+  $items['congress_district'] = array(
+    'arguments' => array('district' => NULL, 'contact' => NULL),
+  );
+  $items['congress_legislator'] = array(
+    'arguments' => array('legislator' => NULL, 'display_params' => NULL),
+  );
+  return $items;
+}
+
+function theme_congress_district($district, $contact = NULL) {
+  $title = 'Members of congress for ';
+  if (!empty($contact)) {
+    $title .= $contact['city'] . ', ' . $contact['state_province'] . ' ' . $contact['postal_code'];
+    if (!empty($contact['postal_code']) && !empty($contact['postal_code_suffix'])) {
+      $title .= '-' . $contact['postal_code_suffix'];
+    }
+  }
+  else {
+    $title .= $district['cd'];
+  }
+  drupal_set_title($title);
+  if (user_access('view congress members')) {
+    $output = '<p>'. l('View more districts', 'congress/all') .'</p>';
+  }
+  if (isset($district['legislators'])) {
+    $cols = count($district['legislators']);
+    $output .= '<div id="legislators-'. $cols .'-cols">';
+    foreach ($district['legislators'] as $legislator) {
+      $output .= theme('congress_legislator', $legislator);
+    }
+    $output .= '</div>';
+  }
+  return $output;
+}
+
+function theme_congress_legislator($legislator, $display_params = array()) {
+
+  drupal_add_css(drupal_get_path('module', 'congress') .'/congress.css', 'module', 'all', FALSE);
+
+  // Build display_params.
+  if (empty($display_params)) {
+    $display_params = array('name', 'nickname', 'photo', 'congress_office', 'phone', 'fax',
+      'email', 'website', 'webform', 'bioguide_id', 'votesmart_id', 'govtrack_id', 'crp_id',
+      'eventful_id',  'congresspedia_url', 'twitter', 'youtube_url');
+  }
+
+  // We flip this because it's easier to do if(isset()) rather than if(array_search()).
+  $display_params = array_flip($display_params);
+
+  // Build name.
+  $name = $legislator['title'] . '. ' . $legislator['firstname'];
+  if (
+    isset($display_params['nickname']) &&
+    !empty($legislator['nickname']) &&
+    $legislator['nickname'] != $legislator['firstname']
+  ) {
+    $name .= " ($legislator[nickname])";
+  }
+  $name .= ' ' . $legislator['middlename'] . ' ' . $legislator['lastname'] . ' ' .
+    $legislator['name_suffix'];
+  $name .= ' (' . $legislator['party'] .
+    (!empty($legislator['district']) ? ' - '. $legislator['state'] . $legislator['district'] : '') . ')';
+
+  // Build output.
+  $output = '<div class="legislator">';
+  if (isset($display_params['name'])) {
+    $output .= "<h3>$name</h3>";
+  }
+  if (isset($display_params['photo']) && !empty($legislator['bioguide_id'])) {
+    $letter = substr($legislator['bioguide_id'], 0, 1);
+    $output .= '<div class="img-wrapper">'. theme('image'
+      , "http://bioguide.congress.gov/bioguide/photo/$letter/$legislator[bioguide_id].jpg"
+      , ' ', $name, array('height' => '200px'), FALSE) .'</div>';
+  }
+  if (isset($display_params['congress_office']) && !empty($legislator['congress_office'])) {
+    $output .= '<p>'. $legislator['congress_office'] .'<br />'.
+      'Washington, DC</p>';
+  }
+  if (isset($display_params['phone']) && !empty($legislator['phone'])) {
+    $output .= '<p>Phone: '. $legislator['phone'] .'</p>';
+  }
+  if (isset($display_params['fax']) && !empty($legislator['fax'])) {
+    $output .= '<p>Fax: '. $legislator['fax'] .'</p>';
+  }
+  if (isset($display_params['email']) && !empty($legislator['email'])) {
+    $output .= '<p>'. l($legislator['email'], 'mailto:' . $legislator['email']) .'</p>';
+  }
+  if (isset($display_params['webform']) && !empty($legislator['webform'])) {
+    $output .= '<p>'. l('Webform', $legislator['webform'], array('target' => '_blank')) . '</p>';
+  }
+  if (isset($display_params['website']) && !empty($legislator['website'])) {
+    $output .= '<p>'. l($legislator['website'], $legislator['website']
+      , array('target' => '_blank')) .'</p>';
+  }
+  if (isset($display_params['bioguide_id']) && !empty($legislator['bioguide_id'])) {
+    $output .= '<p>'. l('Directory of Congress',
+      'http://bioguide.congress.gov/scripts/biodisplay.pl',
+      array(
+        'attributes' => array('target' => '_blank'),
+        'query' => 'index='. $legislator['bioguide_id'])
+      ) .'</p>';
+  }
+  if (isset($display_params['votesmart_id']) && !empty($legislator['votesmart_id'])) {
+    $output .= '<p>'. l('Project Vote Smart', 'http://votesmart.org/bio.php'
+      , array('attributes' => array('target' => '_blank'),
+      'query' => 'can_id='. $legislator['votesmart_id'])) .'</p>';
+  }
+  if (isset($display_params['govtrack_id']) && !empty($legislator['govtrack_id'])) {
+    $output .= '<p>'. l('Govtrack', 'http://govtrack.us/congress/person.xpd'
+      , array('attributes' => array('target' => '_blank'),
+      'query' => 'id='. $legislator['govtrack_id'])) .'</p>';
+  }
+  if (isset($display_params['crp_id']) && !empty($legislator['crp_id'])) {
+    $output .= '<p>'. l('OpenSecrets', 'http://www.opensecrets.org/politicians/summary.php'
+      , array('attributes' => array('target' => '_blank'),
+      'query' => 'cid='. $legislator['crp_id'])) .'</p>';
+  }
+  // eventful is depricated from Sunlight.
+//  if (isset($display_params['eventful_id']) && !empty($legislator['eventful_id'])) {
+//    $eventful_name = strtolower($legislator['firstname'] . '-' . $legislator['lastname'] .'-');
+//    $output .= '<p>'. l('eventful',
+//      "http://eventful.com/performers/$eventful_name/$legislator[eventful_id]",
+//      array('target' => '_blank')) .'</p>';
+//  }
+  if (isset($display_params['congresspedia_url']) && !empty($legislator['congresspedia_url'])) {
+    $output .= '<p>'. l('OpenCongress', $legislator['congresspedia_url']
+      , array('target' => '_blank')) .'</p>';
+  }
+  if (isset($display_params['youtube_url']) && !empty($legislator['youtube_url'])) {
+    $output .= '<p>'. l('YouTube', $legislator['youtube_url']
+      , array('target' => '_blank')) .'</p>';
+  }
+  if (isset($display_params['twitter']) && !empty($legislator['twitter'])) {
+    $output .= '<p>'. l('Twitter', 'http://twitter.com/'. $legislator['twitter']
+      , array('target' => '_blank')) .'</p>';
+  }
+  $output .= '</div>';
+  return $output;
+}
