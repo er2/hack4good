@@ -1670,7 +1670,6 @@ function _cd_sunlight_contact_set_cd($contact_id, $cd = NULL, $override = NULL) 
  *  array of data or FALSE on error.
  */
 function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
-  drupal_debug($params, '$params');
 
   // Sanity checking.
   if (!is_array($params) || !count($params)) {
