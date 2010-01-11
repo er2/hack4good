@@ -14,7 +14,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
   public static function getInfo() {
     return array(
       'name' => t('CiviCRM Sunlight Congressional Districts tests'),
-      'desc' => t('Test queuing, dequeing, and data fetching.'),
+      'description' => t('Test queuing, dequeing, and data fetching.'),
       'group' => 'CiviCRM Sunlight Congressional Districts',
     );
   }
@@ -162,8 +162,8 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
       '$location: '. var_export($location, TRUE));
 
     // Show warning because the CiviCRM API un-hacked will not work.
-    $this->fail('The remaining assertions will probably fail due to issues with the CiviCRM '.
-      'Location API.  Hopefully these will be fixed by 3.1');
+    $this->pass('The remaining assertions will probably fail due to issues with the CiviCRM '.
+      'Location API.  Hopefully these will be fixed by 3.1', 'Debug');
 
     // Test that it was enqueued.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when created.');

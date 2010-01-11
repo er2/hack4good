@@ -323,6 +323,7 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
  * Admin settings form.
  */
 function cd_sunlight_settings_form() {
+  civicrm_initialize();
   $form = array();
   $form['cd_sunlight_api_key'] = array(
     '#type' => 'textfield',
@@ -339,24 +340,78 @@ function cd_sunlight_settings_form() {
       . 'Only applicable to Linux based servers. '),
     '#default_value' => variable_get('cd_sunlight_cron_load_limit', 2),
   );
-  $form['cd_sunlight_geocoding_off'] = array(
+  $form['cd_sunlight_geocode'] = array(
+    '#type' => 'fieldset',
+    '#collapsed' => TRUE,
+    '#collapsible' => TRUE,
+    '#title' => 'Advanced Geocoding',
+    '#description' => t('You should <a href="!url_geocode">enable geocoding within CiviCRM</a> '
+      . "for more accurate determination of a contact's congressional district (some congressional "
+      . 'districts contain more than one zip code).  However geocoding can put a big load on your '
+      . 'server if you are ever saving several contacts per second from multiple HTTP requests. '
+      . 'Instead CiviCRM Sunlight Congressional District has the ability to override CiviCRM and '
+      . 'perform geocoding only in batches during cron and on any CiviCRM profiles used for '
+      . '"View/Edit User Account".  To use this feature you first must <a href="!url_setup">setup '
+      . ' a user, password and key for CiviCRM Command-line usage</a>. Enter these values below. '
+      , array(
+        '!url_geocode' => url('civicrm/admin/setting/mapping'),
+        '!url_setup' => url('http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration'),
+      )),
+  );
+  $form['cd_sunlight_geocode']['cd_sunlight_geocoding_off'] = array(
     '#type' => 'checkbox',
     '#title' => t('Run CiviCRM geocoding only during cron and some CiviCRM profiles'),
-    '#description' => t('You can <a href="!url">enable geocoding within CiviCRM</a> '
-      . "for more accurate determination of a "
-      . "contact's congressional district (some congressional districts contain more than one zip "
-      . "code).  However geocoding can put a big load on your server if you are ever saving "
-      . "several contacts per second from multiple HTTP requests. If you enable this option "
-      . "geocoding will "
-      . "only be run in batches during cron and on CiviCRM profiles "
-      . 'used for "View/Edit User Account". '
-      , array('!url' => url('civicrm/admin/setting/mapping'))),
     '#default_value' => variable_get('cd_sunlight_geocoding_off', FALSE),
   );
-  return system_settings_form($form);
+  $form['cd_sunlight_geocode']['cd_sunlight_geocode_key'] = array(
+    '#title' => t('CiviCRM command-line script key'),
+    '#type' => 'item',
+    '#value' => defined('CIVICRM_SITE_KEY') ? 'Is defined' : 'Is not defined',
+    '#description' => t('The CiviCRM command-line key. '),
+  );
+  $form['cd_sunlight_geocode']['cd_sunlight_geocode_crypt'] = array(
+    '#title' => t('Crypt libraries'),
+    '#type' => 'item',
+    '#value' => _cd_sunlight_crypt_enabled() ? 'Available' : 'Not available',
+    '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the user '
+      . 'and password. ', array(
+        '!url' => url('http://www.php.net/manual/en/book.mcrypt.php'),
+      )),
+  );
+  $form['cd_sunlight_geocode']['cd_sunlight_geocode_username'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username used in CiviCRM geocode script'),
+    '#disabled' => !_cd_sunlight_crypt_enabled(),
+    '#default_value' => _cd_sunlight_crypt_decrypt(variable_get('cd_sunlight_geocode_username', '')),
+    '#attributes' => array('autocomplete' => 'off'),
+  );
+  $form['cd_sunlight_geocode']['cd_sunlight_geocode_password'] = array(
+    '#type' => 'item',
+    '#title' => t('Password used in CiviCRM geocode script'),
+    '#value' => defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ? 'Is defined' : 'Is not defined',
+    '#description' => t('You must define the password in a constant called !const in settings.php',
+      array('!const' => 'CD_SUNLIGHT_GEOCODE_PASSWORD')),
+    '#attributes' => array('autocomplete' => 'off'),
+  );
+  $form['cd_sunlight_geocode']['test'] = array(
+    '#type' => 'fieldset',
+    '#description' => t('You will need to resolve any issues show here, or in <a href="!url">the '
+      . 'logs</a> (PHP timeouts, etc.) before batch geocoding will work. ', array(
+        '!url' => url('admin/reports/dblog'),
+      )),
+  );
+  $form['cd_sunlight_geocode']['test']['test'] = array(
+    '#type' => 'submit',
+    '#value' => t('Test batch geocoding'),
+    '#submit' => array('cd_sunlight_contacts_geocode'),
+  );
+  
+  $form = system_settings_form($form);
+  return $form;
 }
 
 function cd_sunlight_settings_form_validate($form, &$form_state) {
+
   // Temporarily replace the existing API key.
   $key_existing = variable_get('cd_sunlight_api_key', '');
   variable_set('cd_sunlight_api_key', $form_state['values']['cd_sunlight_api_key']);
@@ -364,15 +419,45 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
   // Test the new one.
   if (!_cd_sunlight_connection_test()) {
     form_set_error('cd_sunlight_api_key'
-      , t('Either your key is not valid, or the Sunlight API is down. '
+      , t('Either the Sunlight key is not valid, or the Sunlight API is down. '
         .'See watchdog for more detailed information.'));
   }
   else {
-    drupal_set_message(t('Your API key works.'));
+    drupal_set_message(t('The Sunlight API key works.'));
   }
 
   // Revert.
   variable_set('cd_sunlight_api_key', $key_existing);
+
+  // Test the geocoding username.
+  if ($user_name = $form_state['values']['cd_sunlight_geocode_username']) {
+    $message = 'The geocoding user does not exist';
+    $user_valid = FALSE;
+    $account = user_load(array('name' => $user_name));
+    if ($account && $account->uid) {
+      $message = 'The geocoding user exists';
+      if (user_access('access all custom data', $account)) {
+        $message .= ' with correct permissions';
+        drupal_set_message($message);
+        $user_valid = TRUE;
+      }
+      else {
+        $message .= ' but without correct permissions';
+      }
+    }
+    if (!$user_valid) {
+      form_set_error('cd_sunlight_geocode_username', $message);
+    }
+
+    // Encrypt the geocoding username.
+    if (_cd_sunlight_crypt_enabled()) {
+      $user_name_encrypted =
+        _cd_sunlight_crypt_encrypt($user_name);
+      form_set_value($form['cd_sunlight_geocode']['cd_sunlight_geocode_username'],
+        $user_name_encrypted, $form_state);
+    }
+  }
+
 }
 
 /**
@@ -892,6 +977,17 @@ function cd_sunlight_validate_civicrm_data($contact) {
  */
 function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
 
+  // Sanity checking.
+  if (
+    !variable_get('cd_sunlight_geocode_username', '') ||
+    !defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ||
+    defined('CIVICRM_SITE_KEY') ||
+    !_cd_sunlight_crypt_enabled()
+  ) {
+    watchdog('cd_sunlight', 'Batch geocoding has not been setup.  Please check the ' .
+      '<a href="!url">settings</a>.', array('!url' => 'admin/settings/cd_sunlight'), WATCHDOG_ERROR);
+  }
+
   // Get the start and end IDs.
   if ($number_of_contacts == 'all') {
     $start_id = 0;
@@ -925,11 +1021,10 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
   }
 
   // Build script parameters.
-  $username = variable_get('cd_sunlight_geocode_username', '');
-  $password = variable_get('cd_sunlight_geocode_password', '');
   $query = array(
-    'name' => $username,
-    'pass' => $password,
+    'name' => _cd_sunlight_crypt_decrypt(variable_get('cd_sunlight_geocode_username', '')),
+    'pass' => CD_SUNLIGHT_GEOCODE_PASSWORD,
+    'key' => CIVICRM_SITE_KEY,
     'start' => $start_id,
   );
   if (!empty($end_id)) {
@@ -2052,4 +2147,36 @@ function _cd_sunlight_geocode_set($status = 'disabled', $set_database = FALSE) {
     db_set_active();
   }
   return TRUE;
+}
+
+/**
+ * Encrypts a string.
+ */
+function _cd_sunlight_crypt_encrypt($text) {
+  if (!_cd_sunlight_crypt_enabled() || !defined('CIVICRM_SITE_KEY') || empty($text)) {
+    return FALSE;
+  }
+  $text = trim(base64_encode(mcrypt_encrypt(
+    MCRYPT_BLOWFISH, CIVICRM_SITE_KEY, $text, MCRYPT_MODE_ECB)));
+  return $text;
+}
+
+/**
+ * Decrypts a string.
+ */
+function _cd_sunlight_crypt_decrypt($text) {
+  if (!_cd_sunlight_crypt_enabled() || !defined('CIVICRM_SITE_KEY') || empty($text)) {
+    return FALSE;
+  }
+  $text = trim(mcrypt_decrypt(
+    MCRYPT_BLOWFISH, CIVICRM_SITE_KEY, base64_decode($text), MCRYPT_MODE_ECB));
+  return $text;
+}
+
+/**
+ * Are we setup to do encryption?
+ */
+function _cd_sunlight_crypt_enabled() {
+  return function_exists('mcrypt_encrypt') && defined('MCRYPT_BLOWFISH') &&
+    defined('MCRYPT_MODE_ECB');
 }
