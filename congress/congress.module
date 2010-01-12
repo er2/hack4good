@@ -272,6 +272,10 @@ function congress_district_view($account, $cd = NULL) {
       // TODO: use the CiviCRM API for this one.
       $contact = civicrm_contact_get($search_parameters);
       if (civicrm_error($contact)) {
+        watchdog('congress', 'A contact could not be retreived: @contact @search_parameters', array(
+          '@contact' => var_export($contact, TRUE),
+          '@search_parameters' => var_export($search_parameters, TRUE),
+        ));
         $contact = NULL;
       }
     }

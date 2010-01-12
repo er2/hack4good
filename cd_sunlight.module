@@ -106,7 +106,7 @@ function cd_sunlight_cron() {
   $last_run = variable_get('cd_sunlight_last_process_new_regions', 0);
   $time = $_SERVER['REQUEST_TIME'];
   $day_ago = ($time - 60 * 60 * 24);
-  $has_been_populated = (bool)db_result(db_query_range('SELECT 1 FROM {cd_sunlight_legislators}', 0, 1));
+  $has_been_populated = _cd_sunlight_legislators_exist();
   if (!$has_been_populated || $last_run < $day_ago) {
     _cd_sunlight_zone_update_all();
     variable_set('cd_sunlight_last_process_new_regions', $time);
@@ -148,7 +148,7 @@ function cd_sunlight_requirements($phase) {
       );
     }
 
-    // Report the number of records in the queue.
+    // Report the number of records in the lookup queue.
     $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron}'));
     $requirements['cd_sunlight_count'] = array(
       'title' => 'CiviCRM Sunlight Congressional District',
@@ -158,7 +158,7 @@ function cd_sunlight_requirements($phase) {
       'severity' => REQUIREMENT_INFO
     );
 
-    // Report the number of records in the queue.
+    // Report the number of records in the batch geocoding queue.
     if (variable_get('cd_sunlight_geocoding_off', FALSE)) {
       db_set_active('civicrm');
       $count = db_result(db_query('SELECT COUNT(*) FROM civicrm_address
@@ -172,6 +172,16 @@ function cd_sunlight_requirements($phase) {
           array('!count' => $count)),
         'count' => $count,
         'severity' => REQUIREMENT_INFO
+      );
+    }
+
+    // Report an error if there are no legislators (cron needs to be run).
+    if (!_cd_sunlight_legislators_exist()) {
+      $requirements['cd_sunlight_legislators_exist'] = array(
+        'title' => 'Members of Congress',
+        'value' => 'Do not exist',
+        'description' => t('Run cron to retrieve members of Congress from Sunlight.'),
+        'severity' => REQUIREMENT_ERROR,
       );
     }
 
@@ -344,7 +354,7 @@ function cd_sunlight_settings_form() {
     '#type' => 'fieldset',
     '#collapsed' => TRUE,
     '#collapsible' => TRUE,
-    '#title' => 'Advanced Geocoding',
+    '#title' => 'Advanced Batch Geocoding',
     '#description' => t('You should <a href="!url_geocode">enable geocoding within CiviCRM</a> '
       . "for more accurate determination of a contact's congressional district (some congressional "
       . 'districts contain more than one zip code).  However geocoding can put a big load on your '
@@ -353,6 +363,7 @@ function cd_sunlight_settings_form() {
       . 'perform geocoding only in batches during cron and on any CiviCRM profiles used for '
       . '"View/Edit User Account".  To use this feature you first must <a href="!url_setup">setup '
       . ' a user, password and key for CiviCRM Command-line usage</a>. Enter these values below. '
+      . '<br />NOTE: 95% of sites will not require or see any benefit from batch geocoding.'
       , array(
         '!url_geocode' => url('civicrm/admin/setting/mapping'),
         '!url_setup' => url('http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration'),
@@ -373,8 +384,8 @@ function cd_sunlight_settings_form() {
     '#title' => t('Crypt libraries'),
     '#type' => 'item',
     '#value' => _cd_sunlight_crypt_enabled() ? 'Available' : 'Not available',
-    '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the user '
-      . 'and password. ', array(
+    '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the '
+      . 'username. ', array(
         '!url' => url('http://www.php.net/manual/en/book.mcrypt.php'),
       )),
   );
@@ -395,7 +406,7 @@ function cd_sunlight_settings_form() {
   );
   $form['cd_sunlight_geocode']['test'] = array(
     '#type' => 'fieldset',
-    '#description' => t('You will need to resolve any issues show here, or in <a href="!url">the '
+    '#description' => t('You will need to resolve any issues shown here, or in <a href="!url">the '
       . 'logs</a> (PHP timeouts, etc.) before batch geocoding will work. ', array(
         '!url' => url('admin/reports/dblog'),
       )),
@@ -981,12 +992,14 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
   if (
     !variable_get('cd_sunlight_geocode_username', '') ||
     !defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ||
-    defined('CIVICRM_SITE_KEY') ||
+    !defined('CIVICRM_SITE_KEY') ||
     !_cd_sunlight_crypt_enabled()
   ) {
     watchdog('cd_sunlight', 'Batch geocoding has not been setup.  Please check the ' .
       '<a href="!url">settings</a>.', array('!url' => 'admin/settings/cd_sunlight'), WATCHDOG_ERROR);
   }
+
+  watchdog('cd_sunlight', 'Batch geocoding CiviCRM contacts', array(), WATCHDOG_INFO);
 
   // Get the start and end IDs.
   if ($number_of_contacts == 'all') {
@@ -1031,20 +1044,24 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
     $query['end'] = $end_id;
   }
   $query_string = drupal_query_string_encode($query);
-  $script = url(drupal_get_path('module', 'civicrm') .
-    '/../bin/UpdateAddress.php', array('query' => $query_string, 'absolute' => TRUE));
+  $script = drupal_get_path('module', 'civicrm') . '/../bin/UpdateAddress.php';
+  $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
 
   // Run the CiviCRM cron script.
-  $response = drupal_http_request($script, array(), 'GET', NULL, 3, 600);
+  $response = drupal_http_request($url, array(), 'GET', NULL, 3, 600);
 
   // Log results.
   if ($response->code == 200 && strpos($response->data, 'Addresses Geocoded :') !== FALSE) {
-    watchdog('cd_sunlight', /*"$start_id:$end_id ".*/ $response->data);
+    watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_NOTICE);
   }
   else {
+    // Rebuild the URL without the password to give the admin some feedback.
+    $query['pass'] = 'XXXX';
+    $query_string = drupal_query_string_encode($query);
+    $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
     watchdog('cd_sunlight',
       'Error during contact geocoding: %error',
-      array('%error' => $response->code . ': ' . $response->error . '; ' . $response->data),
+      array('%error' => $response->code . ': ' . $response->error . '; ' . $response->data . ' ' . $url),
       WATCHDOG_ERROR);
   }
 
@@ -1828,6 +1845,8 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
  */
 function _cd_sunlight_zone_update_all() {
 
+  watchdog('cd_sunlight', 'Updating all members of congress', array(), WATCHDOG_INFO);
+
   // Get a list of all states and fetch the senators for those states.
   require_once('CRM/Core/PseudoConstant.php');
   $district_count = 0;
@@ -1934,6 +1953,8 @@ function _cd_sunlight_process_queue() {
       }
 
   }
+
+  watchdog('cd_sunlight', 'Processing queued CD lookups', array(), WATCHDOG_INFO);
 
   // Update our CDs.
   civicrm_initialize();
@@ -2179,4 +2200,14 @@ function _cd_sunlight_crypt_decrypt($text) {
 function _cd_sunlight_crypt_enabled() {
   return function_exists('mcrypt_encrypt') && defined('MCRYPT_BLOWFISH') &&
     defined('MCRYPT_MODE_ECB');
+}
+
+
+/**
+ * Check to see if there's any legislators in the table.
+ *
+ * @return boolean
+ */
+function _cd_sunlight_legislators_exist() {
+  return (bool)db_result(db_query_range('SELECT 1 FROM {cd_sunlight_legislators}', 0, 1));
 }
