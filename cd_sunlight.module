@@ -1055,8 +1055,9 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
     watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_NOTICE);
   }
   else {
-    // Rebuild the URL without the password to give the admin some feedback.
+    // Rebuild the URL without the kay or password to give the admin some feedback.
     $query['pass'] = 'XXXX';
+    $query['key'] = 'XXXX';
     $query_string = drupal_query_string_encode($query);
     $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
     watchdog('cd_sunlight',
