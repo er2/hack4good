@@ -142,7 +142,7 @@ function cd_sunlight_requirements($phase) {
       $requirements['cd_sunlight_setup'] = array(
         'title' => 'CiviCRM Sunlight Congressional District',
         'description' => t('You have not <a href="!url">configured</a> the module.'
-          , array('!configured' => url('admin/settings/cd_sunlight'))),
+          , array('!configured' => url('/admin/settings/cd_sunlight'))),
         'severity' => REQUIREMENT_ERROR,
         'value' => t('Not configured'),
       );
@@ -243,15 +243,20 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
     }
 
     // Is this different from the stored contact (i.e. has the address changed)?
-    require_once('api/v2/Contact.php');
     $params = array(
       'contact_id' => $contact_id,
       'return.postal_code' => TRUE,
       'return.street_address' => TRUE,
     );
-    if (civicrm_error($contact = civicrm_contact_get($params))) {
-      watchdog('cd_sunlight', 'Error loading contact in cd_lookup_civicrm_pre()', array(),
-        WATCHDOG_ERROR,
+    $contact = _cd_sunlight_civicrm_contact_get($params);
+    if (civicrm_error($contact)) {
+      $backtrace = debug_backtrace();
+      $info = array();
+      foreach ($backtrace as $trace) {
+        $info[] = "$trace[file]($trace[line]): $trace[function]";
+      }
+      watchdog('cd_sunlight', 'Error loading contact in cd_lookup_civicrm_pre(). @info',
+        array('@info' => var_export($info, TRUE)), WATCHDOG_ERROR,
         l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
       return TRUE;
     }
@@ -415,8 +420,12 @@ function cd_sunlight_settings_form() {
     '#type' => 'submit',
     '#value' => t('Test batch geocoding'),
     '#submit' => array('cd_sunlight_contacts_geocode'),
+    '#disabled' => !_cd_sunlight_crypt_enabled() ||
+      !defined('CIVICRM_SITE_KEY') ||
+      defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ||
+      !variable_get('cd_sunlight_geocode_username', ''),
   );
-  
+
   $form = system_settings_form($form);
   return $form;
 }
@@ -613,17 +622,14 @@ function cd_sunlight_contact_dequeue($contact_id) {
  */
 function cd_sunlight_contact_get_cd($contact_id) {
 
-  civicrm_initialize();
-  require_once('api/v2/Contact.php');
-
   // Find the contact.
   $params = array(
     'contact_id' => $contact_id,
     'return.' . CD_SUNLIGHT_CIVICRM_CD => TRUE,
     'return.' . CD_SUNLIGHT_CIVICRM_CD_OVERRIDE => TRUE,
   );
-
-  if (civicrm_error($contact = civicrm_contact_get($params))) {
+  $contact = _cd_sunlight_civicrm_contact_get($params);
+  if (civicrm_error($contact)) {
     $backtrace = debug_backtrace();
     $backtrace = array_shift($backtrace);
     watchdog('cd_sunlight',
@@ -988,6 +994,8 @@ function cd_sunlight_validate_civicrm_data($contact) {
  */
 function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
 
+  civicrm_initialize();
+
   // Sanity checking.
   if (
     !variable_get('cd_sunlight_geocode_username', '') ||
@@ -996,7 +1004,7 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
     !_cd_sunlight_crypt_enabled()
   ) {
     watchdog('cd_sunlight', 'Batch geocoding has not been setup.  Please check the ' .
-      '<a href="!url">settings</a>.', array('!url' => 'admin/settings/cd_sunlight'), WATCHDOG_ERROR);
+      '<a href="!url">settings</a>.', array('!url' => '/admin/settings/cd_sunlight'), WATCHDOG_ERROR);
   }
 
   watchdog('cd_sunlight', 'Batch geocoding CiviCRM contacts', array(), WATCHDOG_INFO);
@@ -1055,7 +1063,7 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
     watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_NOTICE);
   }
   else {
-    // Rebuild the URL without the kay or password to give the admin some feedback.
+    // Rebuild the URL without the key or password to give the admin some feedback.
     $query['pass'] = 'XXXX';
     $query['key'] = 'XXXX';
     $query_string = drupal_query_string_encode($query);
@@ -1218,8 +1226,6 @@ function _cd_sunlight_build_sql_clause($params, $implode_string) {
  *    'state' => 'NY',
  *    'district' => '17',
  *  );
- * @return boolean
- *  TRUE on success, else FALSE.
  */
 function _cd_sunlight_legislator_delete($params) {
 
@@ -1233,8 +1239,7 @@ function _cd_sunlight_legislator_delete($params) {
 
   // Run Query.
   $sql = 'DELETE FROM {cd_sunlight_legislators} WHERE ' . $where;
-  return (bool) db_query($sql, $params);
-
+  db_query($sql, $params);
 }
 
 /**
@@ -1279,11 +1284,11 @@ function _cd_sunlight_legislator_save($legislator) {
  *  A legislator array as returned from sunlight.
  * @return array
  *  The trimmed legislator
- * @todo we can now use schema API for this. 
+ * @todo we can now use schema API for this.
  */
 function _cd_sunlight_legislator_filter_fields($legislator) {
   static $fields = array();
-  
+
   if (empty($fields)) {
     $schema = drupal_get_schema_unprocessed('cd_sunlight', 'cd_sunlight_legislators');
     $fields = $schema['fields'];
@@ -1402,13 +1407,7 @@ function _cd_sunlight_zone_update($zone, $name) {
   }
 
   // Because we only care about current legislators, delete any previous matching records.
-  if (_cd_sunlight_legislator_delete($params) == FALSE) {
-    watchdog('cd_sunlight', 'Could not delete previous legislators in %zone - %name',
-      array('%zone' => $zone, '%name' => $name),
-      WATCHDOG_ERROR
-    );
-    return FALSE;
-  }
+  _cd_sunlight_legislator_delete($params);
 
   // Save our new legislators.
   $error = FALSE;
@@ -1546,7 +1545,7 @@ function _cd_sunlight_contact_apilookup($contact) {
       watchdog('cd_sunlight',
         'Point not within a congressional district, trying again with only zip: @params',
         array('@params' => var_export($params, TRUE)),
-        WATCHDOG_NOTICE, 
+        WATCHDOG_NOTICE,
         l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $params['contact_id'])));
       unset($contact['geo_code_1'], $contact['geo_code_2'],
         $contact['latitude'], $contact['longitude']);
@@ -1609,8 +1608,6 @@ function _cd_sunlight_contact_apilookup($contact) {
 function _cd_sunlight_contact_cd_update($contact_id) {
 
   // Load the contact.
-  civicrm_initialize();
-  require_once('api/v2/Contact.php');
   $params = array(
     'contact_id' => $contact_id,
     'return.postal_code' => TRUE,
@@ -1624,7 +1621,8 @@ function _cd_sunlight_contact_cd_update($contact_id) {
     'return.'. CD_SUNLIGHT_CIVICRM_CD_OVERRIDE => TRUE,
     'return.'. CD_SUNLIGHT_CIVICRM_CD => TRUE,
   );
-  if (civicrm_error($contact = civicrm_contact_get($params))) {
+  $contact = _cd_sunlight_civicrm_contact_get($params);
+  if (civicrm_error($contact)) {
     watchdog('cd_sunlight', 'Error loading contact in cd_lookup_civicrm_pre()', array(),
       WATCHDOG_ERROR,
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
@@ -1803,7 +1801,7 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
   if ($response->code == 400) {
     // The connection was successful, but Sunlight encountered an error.
     // When Sunlight encounters an error it sends code 400 and an error message in the data.
-    // We don't watchdog here because we gracefully handle errors in the calling function. 
+    // We don't watchdog here because we gracefully handle errors in the calling function.
     $error_message = $response->data;
     return FALSE;
   }
@@ -2179,7 +2177,7 @@ function _cd_sunlight_crypt_encrypt($text) {
     return FALSE;
   }
   $text = trim(base64_encode(mcrypt_encrypt(
-    MCRYPT_BLOWFISH, CIVICRM_SITE_KEY, $text, MCRYPT_MODE_ECB)));
+    MCRYPT_BLOWFISH, CIVICRM_SITE_KEY, $text, MCRYPT_MODE_ECB, _cd_sunlight_crypt_iv())));
   return $text;
 }
 
@@ -2190,8 +2188,8 @@ function _cd_sunlight_crypt_decrypt($text) {
   if (!_cd_sunlight_crypt_enabled() || !defined('CIVICRM_SITE_KEY') || empty($text)) {
     return FALSE;
   }
-  $text = trim(mcrypt_decrypt(
-    MCRYPT_BLOWFISH, CIVICRM_SITE_KEY, base64_decode($text), MCRYPT_MODE_ECB));
+  $text = trim(mcrypt_decrypt(MCRYPT_BLOWFISH,
+    CIVICRM_SITE_KEY, base64_decode($text), MCRYPT_MODE_ECB, _cd_sunlight_crypt_iv()));
   return $text;
 }
 
@@ -2203,6 +2201,24 @@ function _cd_sunlight_crypt_enabled() {
     defined('MCRYPT_MODE_ECB');
 }
 
+/**
+ * Get our IV.
+ */
+function _cd_sunlight_crypt_iv() {
+  $iv = variable_get('cd_sunlight_crypt_iv', '');
+  if (empty($iv)) {
+    $iv_size = mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
+    // We want to store this in the variables table.  But if we use the mcrypt functions to build
+    // the IV we'll get a non-ascii string which will cause errors during serialization.  So we'll
+    // build our own IV from the site private key.
+    $iv = drupal_substr(drupal_get_private_key(), 0, $iv_size);
+    if (drupal_strlen($iv) < $iv_size) {
+      str_pad($iv, $iv_size, mt_rand());
+    }
+    variable_set('cd_sunlight_crypt_iv', $iv);
+  }
+  return $iv;
+}
 
 /**
  * Check to see if there's any legislators in the table.
@@ -2211,4 +2227,28 @@ function _cd_sunlight_crypt_enabled() {
  */
 function _cd_sunlight_legislators_exist() {
   return (bool)db_result(db_query_range('SELECT 1 FROM {cd_sunlight_legislators}', 0, 1));
+}
+
+/**
+ * Depending on the version of CiviCRM in use.  The API will return differently structured arrays.
+ * This normalizes things.
+ *
+ * @see civicrm_contact_get()
+ */
+function _cd_sunlight_civicrm_contact_get($search_params) {
+  civicrm_initialize();
+  require_once 'api/v2/Contact.php';
+  $contact = civicrm_contact_get($search_params);
+  if (civicrm_error($contact)) {
+    return $contact;
+  }
+  if (!isset($contact['contact_id'])) {
+    $contact = array_shift($contact);
+    if (!isset($contact['contact_id'])) {
+      watchdog('cd_sunlight',
+        'CiviCRM is doing strange things.  This version of CiviCRM may not be supported.', array(),
+        WATCHDOG_ERROR);
+    }
+  }
+  return $contact;
 }

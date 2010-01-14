@@ -1,5 +1,5 @@
 <?php
-// $Id$ 
+// $Id$
 
 /**
  * @file
@@ -7,14 +7,14 @@
  */
 
 /**
- * Implementation of hook_install() 
+ * Implementation of hook_install().
  */
 function congress_install() {
 
 }
 
 /**
- * Implementation of hook_uninstall() 
+ * Implementation of hook_uninstall().
  */
 function congress_uninstall() {
   variable_del('congress_block1_senate');

@@ -32,7 +32,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     // Turn CiviCRM geocoding off so that this doesn't fire when we process the queue.
     variable_set('cd_sunlight_geocoding_off', TRUE);
     _cd_sunlight_geocode_set();
-    
+
     // Copy the other required variables.  Don't prefix so that we opperate on the original table.
     $cd_sunlight_api_key = unserialize(db_result(db_query(
       'SELECT value FROM variable WHERE name = "cd_sunlight_api_key"')));
@@ -68,24 +68,6 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
    */
   function testCDSunlight() {
 
-    // Test that the module is setup.
-    $requirements = cd_sunlight_requirements('runtime');
-    $this->verbose(var_export($requirements, TRUE));
-    foreach ($requirements as $requirement) {
-      if ($requirement['severity'] == REQUIREMENT_ERROR) {
-        $this->fail("The module is not setup properly.");
-        return;
-      }
-    }
-
-    // Test that the queue is empty.
-    $count = $requirements['cd_sunlight_count']['count'];
-    if ($count != 0) {
-      $this->fail("There are $count contacts in the cron queue.  ".
-        "The queue needs to be empty to run these simpletests.");
-      return;
-    }
-
     // Setup CiviCRM
     if (!function_exists('civicrm_initialize') || !civicrm_initialize()) {
       $this->fail('CiviCRM does not appear to be setup correctly.');
@@ -93,7 +75,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     }
     $include_result = include('api/v2/Contact.php');
     if ($include_result === FALSE) {
-      $this->fail('CiviCRM does not appear to be setup correctly.');
+      $this->fail('The CiviCRM Contact API could not be included.');
       return;
     }
 
@@ -117,7 +99,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     // We are making an overly complex array here to be compatible with several versions of the
     // CiviCRM API.
     // This is really stoopid to begin with.  We should just be able to manipulate primary locations
-    // via the contact api. 
+    // via the contact api.
     $location_new = array(
       'contact_id' => $contact['contact_id'],
       'version'    => '3.0',
@@ -153,7 +135,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
       'return.country' => TRUE,
       'return.contact_type' => TRUE,
     );
-    $contact = civicrm_contact_get($contact_search);
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00501', 'A CiviCRM contact simpletest@example.org was created.');
     $this->verbose(
       '$new_contact: '. var_export($contact_new, TRUE) .
@@ -173,7 +155,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     _cd_sunlight_process_queue();
     variable_set('cd_sunlight_geocoding_off', TRUE);
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = civicrm_contact_get($contact_search);
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY1', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
     $this->verbose(var_export($contact_search, TRUE) . var_export($contact, TRUE));
 
@@ -202,7 +184,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     }
 
     // We should have the new postal code.
-    $contact = civicrm_contact_get($contact_search);
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '12345', 'CiviCRM contact simpletest@example.org was edited.');
     $this->verbose(
       '$contact_search: '. var_export($contact_search, TRUE) .
@@ -218,7 +200,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     _cd_sunlight_process_queue();
     variable_set('cd_sunlight_geocoding_off', TRUE);
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = civicrm_contact_get($contact_search);
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY21', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
     $this->verbose(
       '$contact_search: '. var_export($contact_search, TRUE) .

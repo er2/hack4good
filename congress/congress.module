@@ -1,5 +1,5 @@
 <?php
-// $Id$ 
+// $Id$
 
 /**
  * @file
@@ -87,7 +87,7 @@ function congress_block($op = 'list', $delta = 0, $edit = array()) {
 }
 
 /**
- * Form for block configuration.  
+ * Form for block configuration.
  *
  * @param string $delta
  *  The block ID.
@@ -258,7 +258,6 @@ function congress_district_view($account, $cd = NULL) {
   $contact = array();
   if (!$cd) {
     $cd = cd_sunlight_user_get_cd($account->uid);
-    require_once('api/v2/Contact.php');
     require_once('api/UFGroup.php');
     $contact_id = crm_uf_get_match_id($account->uid);
     if ($contact_id) {
@@ -269,8 +268,7 @@ function congress_district_view($account, $cd = NULL) {
         'return.postal_code' => TRUE,
         'return.postal_code_suffix' => TRUE,
       );
-      // TODO: use the CiviCRM API for this one.
-      $contact = civicrm_contact_get($search_parameters);
+      $contact = _cd_sunlight_civicrm_contact_get($search_parameters);
       if (civicrm_error($contact)) {
         watchdog('congress', 'A contact could not be retreived: @contact @search_parameters', array(
           '@contact' => var_export($contact, TRUE),
@@ -430,7 +428,7 @@ function theme_congress_legislator($legislator, $display_params = array()) {
     $output .= "<h3>$name</h3>";
   }
   if (isset($display_params['photo']) && !empty($legislator['bioguide_id'])) {
-    $letter = substr($legislator['bioguide_id'], 0, 1);
+    $letter = drupal_substr($legislator['bioguide_id'], 0, 1);
     $output .= '<div class="img-wrapper">'. theme('image'
       , "http://bioguide.congress.gov/bioguide/photo/$letter/$legislator[bioguide_id].jpg"
       , ' ', $name, array('height' => '200px'), FALSE) .'</div>';
