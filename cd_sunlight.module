@@ -422,7 +422,7 @@ function cd_sunlight_settings_form() {
     '#submit' => array('cd_sunlight_contacts_geocode'),
     '#disabled' => !_cd_sunlight_crypt_enabled() ||
       !defined('CIVICRM_SITE_KEY') ||
-      defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ||
+      !defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ||
       !variable_get('cd_sunlight_geocode_username', ''),
   );
 
