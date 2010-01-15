@@ -85,7 +85,7 @@ function cd_sunlight_menu() {
 function cd_sunlight_cron() {
 
   // Only run under low server load.
-  list($load) = explode(" ", `cat /proc/loadavg`);
+  list($load) = sys_getloadavg();
   if (is_numeric($load) && $load > CD_SUNLIGHT_CRON_LOAD_LIMIT) {
     watchdog('cd_sunlight', 'System load is higher than '. CD_SUNLIGHT_CRON_LOAD_LIMIT .
       ', cd_sunlight_cron will not be run.', array(), WATCHDOG_WARNING);
@@ -228,19 +228,37 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
 
     // Bloody hell!  CiviCRM might pass in an object, or an array, and it may have different depths.
     $_ref = (array)$ref;
+    // CiviCRM 2.0-2.2 compatible.
     if (isset($_ref['location'][1]['address'])) {
-      $ref_postal_code = $_ref['location'][1]['address']['postal_code'];
-      $ref_street_address = $_ref['location'][1]['address']['street_address'];
+      foreach ($_ref['location'] as $location) {
+        if ($location['address']['is_primary']) {
+          $address = $location['address'];
+        }
+      }
     }
+    // CiviCRM 2.0-2.2 compatible.
     elseif (isset($_ref['location']['address'])) {
-      $ref_postal_code = $_ref['location']['address']['postal_code'];
-      $ref_street_address = $_ref['location']['address']['street_address'];
+      $address = $_ref['location']['address'];
+    }
+    // CiviCRM 3.0+ compatible.
+    elseif (isset($_ref['address'])) {
+      foreach ($_ref['address'] as $addy) {
+        if ($addy['is_primary']) {
+          $address = $addy;
+        }
+      }
     }
     else {
-      // TODO: Address is not here.
-      // This seems to happen during cron.  It's a bug but we won't get into it right now.
+      // Address is not here.
+      $backtrace = _cd_sunlight_backtrace();
+      watchdog('cd_sunlight', 'Error durring hook_civicrm_pre() This version of CiviCRM might not '.
+        'be supported. @backtrace @ref', array('@backtrace' => $backtrace, '@ref' => var_export($_ref)),
+        WATCHDOG_ERROR,
+        l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
       return TRUE;
     }
+    $ref_postal_code = $address['postal_code'];
+    $ref_street_address = $address['street_address'];
 
     // Is this different from the stored contact (i.e. has the address changed)?
     $params = array(
@@ -250,13 +268,9 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
     );
     $contact = _cd_sunlight_civicrm_contact_get($params);
     if (civicrm_error($contact)) {
-      $backtrace = debug_backtrace();
-      $info = array();
-      foreach ($backtrace as $trace) {
-        $info[] = "$trace[file]($trace[line]): $trace[function]";
-      }
-      watchdog('cd_sunlight', 'Error loading contact in cd_lookup_civicrm_pre(). @info',
-        array('@info' => var_export($info, TRUE)), WATCHDOG_ERROR,
+      $backtrace = _cd_sunlight_backtrace();
+      watchdog('cd_sunlight', 'Error loading contact in cd_lookup_civicrm_pre(). @backtrace @contact',
+        array('@backtrace' => $backtrace, '@contact' => var_export($contact, TRUE)), WATCHDOG_ERROR,
         l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
       return TRUE;
     }
@@ -274,13 +288,38 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
     // CiviCRM doesn't automatically reset the lat/long when an address is edited.
     // This causes issues where if geocoding is disabled, the existing lat/long are now invalid.
     // We'll manually reset the lat/long.  It will be updated when the contact is next geocoded.
-    if (is_array($ref) && !empty($ref['location'][1]['address']['geo_code_1'])) {
-      $ref['location'][1]['address']['geo_code_1'] = '';
-      $ref['location'][1]['address']['geo_code_2'] = '';
+    $geo_code_reset = FALSE;
+    if (is_array($ref)) {
+      // CiviCRM 2.0-2.2 compatible.
+      if (!empty($ref['location'][1]['address']['geo_code_1'])) {
+        foreach ($ref['location'] as &$location) {
+          $location['address']['geo_code_1'] = '';
+          $location['address']['geo_code_2'] = '';
+        }
+        $geo_code_reset = TRUE;
+      }
+      // CiviCRM 3.0+ compatible.
+      elseif (!empty($ref['address'])) {
+        foreach ($ref['address'] as &$address) {
+          $address['geo_code_1'] = '';
+          $address['geo_code_2'] = '';
+        }
+        $geo_code_reset = TRUE;
+      }
     }
+    // CiviCRM 2.0-2.2 compatible.
     elseif (is_object($ref) && !empty($ref->location['address']['geo_code_1'])) {
       $ref->location['address']['geo_code_1'] = '';
       $ref->location['address']['geo_code_2'] = '';
+      $geo_code_reset = TRUE;
+    }
+    if (!$geo_code_reset) {
+     $backtrace = _cd_sunlight_backtrace();
+      watchdog('cd_sunlight', 'Error durring geocode reset.  This version of CiviCRM might not '.
+        'be supported. @backtrace @ref', array('@backtrace' => $backtrace, var_export($ref, TRUE)),
+        WATCHDOG_ERROR,
+        l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
+      return TRUE;
     }
   }
 
@@ -630,18 +669,9 @@ function cd_sunlight_contact_get_cd($contact_id) {
   );
   $contact = _cd_sunlight_civicrm_contact_get($params);
   if (civicrm_error($contact)) {
-    $backtrace = debug_backtrace();
-    $backtrace = array_shift($backtrace);
-    watchdog('cd_sunlight',
-      'CiviCRM API error: @params @contact Called by @file:@function:@line',
-      array(
-        '@params' => var_export($params, TRUE),
-        '@contact' => var_export($contact, TRUE),
-        '@file' => $backtrace['file'],
-        '@function' => $backtrace['function'],
-        '@line' => $backtrace['line']
-      ),
-      WATCHDOG_ERROR,
+    $backtrace = _cd_sunlight_backtrace();
+    watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
+      array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
     return FALSE;
   }
@@ -1745,19 +1775,9 @@ function _cd_sunlight_contact_set_cd($contact_id, $cd = NULL, $override = NULL) 
 
   _cd_sunlight_contact_set_cd_is_running(TRUE);
   if (civicrm_error($contact = civicrm_contact_add($contact))) {
-    $backtrace = debug_backtrace();
-    $backtrace = array_shift($backtrace);
-    watchdog(
-      'cd_sunlight',
-      __LINE__ . ': CiviCRM API error: @params @contact Called by @file : @function : @line' .
-      array(
-        '@params' => var_export($params, TRUE),
-        '@contact' => var_export($contact, TRUE),
-        '@file' => $backtrace['file'],
-        '@function' => $backtrace['function'],
-        '@line' => $backtrace['line']
-      ),
-      WATCHDOG_ERROR,
+    $backtrace = _cd_sunlight_backtrace();
+    watchdog('cd_sunlight', __LINE__ . ': CiviCRM API error: @backtrace @contact',
+      array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id))
     );
     _cd_sunlight_contact_set_cd_is_running(FALSE);
@@ -2251,4 +2271,16 @@ function _cd_sunlight_civicrm_contact_get($search_params) {
     }
   }
   return $contact;
+}
+
+/**
+ * Get some backtrace info as a string suitable for watchdogging.
+ */
+function _cd_sunlight_backtrace() {
+  $backtrace = debug_backtrace();
+  $info = array();
+  foreach ($backtrace as $trace) {
+    $info[] = "$trace[file]($trace[line]): $trace[function]";
+  }
+  return var_export($info, TRUE);
 }
