@@ -85,11 +85,14 @@ function cd_sunlight_menu() {
 function cd_sunlight_cron() {
 
   // Only run under low server load.
-  list($load) = sys_getloadavg();
-  if (is_numeric($load) && $load > CD_SUNLIGHT_CRON_LOAD_LIMIT) {
-    watchdog('cd_sunlight', 'System load is higher than '. CD_SUNLIGHT_CRON_LOAD_LIMIT .
-      ', cd_sunlight_cron will not be run.', array(), WATCHDOG_WARNING);
-    return;
+  if (function_exists('sys_getloadavg')) {
+    list($load) = sys_getloadavg();
+    $limit = variable_get('cd_sunlight_cron_load_limit', 2);
+    if (is_numeric($load) && !empty($limit) && $load > $limit) {
+      watchdog('cd_sunlight', 'System load is higher than '. $limit .
+        ', cd_sunlight_cron will not be run.', array(), WATCHDOG_WARNING);
+      return;
+    }
   }
 
   // Test connection.
@@ -387,13 +390,15 @@ function cd_sunlight_settings_form() {
     '#default_value' => variable_get('cd_sunlight_api_key', ''),
     '#required' => TRUE,
   );
-  $form['cd_sunlight_cron_load_limit'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Cron server load limit'),
-    '#description' => t('Do not run Cron CD lookups if the system load is higher than this value. '
-      . 'Only applicable to Linux based servers. '),
-    '#default_value' => variable_get('cd_sunlight_cron_load_limit', 2),
-  );
+  if (function_exists('sys_getloadavg')) {
+    $form['cd_sunlight_cron_load_limit'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Cron server load limit'),
+      '#description' => t('Do not run Cron CD lookups if the system load is higher than this value. '
+        . 'Only applicable to Linux based servers. '),
+      '#default_value' => variable_get('cd_sunlight_cron_load_limit', 2),
+    );
+  }
   $form['cd_sunlight_geocode'] = array(
     '#type' => 'fieldset',
     '#collapsed' => TRUE,
