@@ -948,7 +948,8 @@ function cd_sunlight_cd_parse_district($cd) {
  * Validate the given CD data.
  *
  * Only validates for proper format, not that the CD actually exists.  If the CD is found to be bad,
- * the contact will be queued for lookup.
+ * the contact will be queued for lookup.  If the CD strings can be coerced into the proper format
+ * the contact will be updated with the new string.
  *
  * @param array $contact
  *  Does not need to be a full CiviCRM contact.  Just a simple array with keys for
