@@ -558,8 +558,10 @@ function cd_sunlight_settings_fields_form() {
     '#title' => 'Congressional District Field',
     '#default_value' => check_plain($field_cd_sunlight_civicrm_cd),
     '#options' => $fields,
-    '#description' => t('Create one alphanumeric text field (should be searchable and '
-      . 'read-only) to store the contact\'s congressional district. '),
+    '#description' => t('Create one alphanumeric text field (should be searchable and if you are '
+      . 'using a version of CiviCRM where bug <a href="!CRM-586">CRM-5686</a> is fixed you '
+      . 'probably want to make the field view-only) to store the contact\'s congressional district.',
+      array('!CRM-586' => 'http://issues.civicrm.org/jira/browse/CRM-5686')),
     '#required' => TRUE,
   );
 
@@ -571,9 +573,8 @@ function cd_sunlight_settings_fields_form() {
     '#title' => 'Congressional District Override Field',
     '#default_value' => check_plain($field_cd_sunlight_civicrm_cd_override),
     '#options' => $fields,
-    '#description' => t('Create a second alphanumeric text field (should be searchable and '
-      . 'read/write) to allow administrators to manually override the value queried from '
-      . 'Sunlight. '),
+    '#description' => t('Create a second alphanumeric text field (should be searchable) '
+      . 'to allow administrators to manually override the value queried from Sunlight. '),
     '#required' => TRUE,
   );
 
