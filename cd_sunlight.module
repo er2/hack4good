@@ -681,10 +681,10 @@ function cd_sunlight_contact_get_cd($contact_id) {
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
     return FALSE;
   }
-  elseif ($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE]) {
+  elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE])) {
     return $contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE];
   }
-  elseif ($contact[CD_SUNLIGHT_CIVICRM_CD]) {
+  elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD])) {
     return $contact[CD_SUNLIGHT_CIVICRM_CD];
   }
   return NULL;
@@ -725,7 +725,7 @@ function cd_sunlight_contact_get_district($contact_id) {
  *  ex. 'NY17' or NULL if not set/error.
  */
 function cd_sunlight_user_get_cd($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact($uid)) {
+  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
     return cd_sunlight_contact_get_cd($contact_id);
   }
 }
@@ -741,7 +741,7 @@ function cd_sunlight_user_get_cd($uid) {
  *  ex. 'NY', or NULL if not set.
  */
 function cd_sunlight_user_get_state($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact($uid)) {
+  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
     return cd_sunlight_contact_get_state($contact_id);
   }
 }
@@ -754,7 +754,7 @@ function cd_sunlight_user_get_state($uid) {
  *  ex. 17 or NULL if not set.
  */
 function cd_sunlight_user_get_district($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact($uid)) {
+  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
     return cd_sunlight_contact_get_district($contact_id);
   }
 }
@@ -1339,16 +1339,16 @@ function _cd_sunlight_legislator_filter_fields($legislator) {
  * @return mixed $contact_id
  *  Integer if it exists, else NULL
  */
-function _cd_sunlight_user_get_contact($uid) {
-    civicrm_initialize();
-    require_once('api/UFGroup.php');
-    if (!($contact_id = crm_uf_get_match_id($uid))) {
-      watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a contact for uid '. $uid ,
-        array(), WATCHDOG_WARNING
-      );
-      return NULL;
-    }
-    return $contact_id;
+function _cd_sunlight_user_get_contact_id($uid) {
+  civicrm_initialize();
+  require_once('api/UFGroup.php');
+  if (!($contact_id = crm_uf_get_match_id($uid))) {
+    watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a contact_id for uid '. $uid ,
+      array(), WATCHDOG_WARNING
+    );
+    return NULL;
+  }
+  return $contact_id;
 }
 
 /**

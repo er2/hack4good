@@ -216,12 +216,12 @@ function _congress_block_view($delta) {
   }
   elseif ($delta == 'own_members_of_congress') {
     if (!$user->uid) {
-      $output = filter_xss(variable_get('congress_block_anonymous_message', ''));
+      $output = filter_xss_admin(variable_get('congress_block_anonymous_message', ''));
     }
     else {
       $cd = cd_sunlight_user_get_cd($user->uid);
       if (empty($cd)) {
-        $output = filter_xss(variable_get('congress_block_no_cd_message', ''));
+        $output = filter_xss_admin(variable_get('congress_block_no_cd_message', ''));
       }
       else {
         $district = cd_sunlight_cd_load($cd);
@@ -267,6 +267,7 @@ function congress_district_view($account, $cd = NULL) {
         'return.state_province' => TRUE,
         'return.postal_code' => TRUE,
         'return.postal_code_suffix' => TRUE,
+        'return.country' => TRUE,
       );
       $contact = _cd_sunlight_civicrm_contact_get($search_parameters);
       if (civicrm_error($contact)) {
@@ -368,22 +369,51 @@ function congress_theme($existing, $type, $theme, $path) {
   return $items;
 }
 
+/**
+ * Themes a congressional district.
+ *
+ * @param array $district
+ *  @see cd_sunlight_cd_load().
+ * @param array $contact
+ *  CiviCRM contact.  Should include city, state_province, postal_code and country.
+ * @return string
+ */
 function theme_congress_district($district, $contact = NULL) {
+  
+  // Page title.
   $title = 'Members of congress for ';
   if (!empty($contact)) {
-    $title .= $contact['city'] . ', ' . $contact['state_province'] . ' ' . $contact['postal_code'];
-    if (!empty($contact['postal_code']) && !empty($contact['postal_code_suffix'])) {
-      $title .= '-' . $contact['postal_code_suffix'];
+    if (!empty($contact['city'])) {
+      $title .= $contact['city'];
+      if (!empty($contact['state_province']) || !empty($contact['postal_code'])) {
+        $title .= ',';
+      }
+      $title .= ' ';
+    }
+    if (!empty($contact['state_province'])) {
+      $title .= $contact['state_province'] . ' ';
+    }
+    if (!empty($contact['postal_code'])) {
+      $title .= $contact['postal_code'] . ' ';
+      if (!empty($contact['postal_code_suffix'])) {
+        $title .= '-' . $contact['postal_code_suffix'];
+      }
+    }
+    else {
+      $title .= $district['cd'];
     }
   }
   else {
     $title .= $district['cd'];
   }
   drupal_set_title($title);
+
   if (user_access('view congress members')) {
     $output = '<p>'. l('View more districts', 'congress/all') .'</p>';
   }
-  if (isset($district['legislators'])) {
+
+  // Display the members of Congress.
+  if (!empty($district['legislators'])) {
     $cols = count($district['legislators']);
     $output .= '<div id="legislators-'. $cols .'-cols">';
     foreach ($district['legislators'] as $legislator) {
@@ -391,9 +421,33 @@ function theme_congress_district($district, $contact = NULL) {
     }
     $output .= '</div>';
   }
+  else {
+    if (
+      isset($contact['country_id']) &&
+        $contact['country_id'] != CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID ||
+      isset($contact['state_province_id']) &&
+        $contact['state_province_id'] == CD_SUNLIGHT_CIVICRM_NON_US_STATE_PROVINCE_ID
+    ) {
+      $output .= t('You do not live in the United States and therefore do not have a Congressional '
+        .'District or any representatives in Congress.');
+    }
+    // This happens either if the contact is queued and not yet looked up, or if the lookup failed.
+    else {
+      $output .= t('Your Congressional District could not be determined.');
+    }
+  }
   return $output;
 }
 
+/**
+ * Themes a member of congress.
+ *
+ * @param array $legislator
+ *  @see cd_sunlight_legislators_get().
+ * @param array $display_params
+ *  The fields to be displayed.
+ * @return string
+ */
 function theme_congress_legislator($legislator, $display_params = array()) {
 
   drupal_add_css(drupal_get_path('module', 'congress') .'/congress.css', 'module', 'all', FALSE);
