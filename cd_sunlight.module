@@ -260,8 +260,12 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
         l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
       return TRUE;
     }
-    $ref_postal_code = $address['postal_code'];
-    $ref_street_address = $address['street_address'];
+    if (isset($address['postal_code'])) {
+      $ref_postal_code = $address['postal_code'];
+    }
+    if (isset($address['street_address'])) {
+      $ref_street_address = $address['street_address'];
+    }
 
     // Is this different from the stored contact (i.e. has the address changed)?
     $params = array(
@@ -1955,23 +1959,26 @@ function _cd_sunlight_process_queue() {
     // Hooks don't fire during CiviCRM cron scripts.  Enqueue all contacts that have lat/long,
     // but not a CD.
     db_set_active('civicrm');
-    $res = db_query('SELECT a.contact_id '.
-      'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
-      'INNER JOIN civicrm_address a '.
+    $res = db_query(
+      'SELECT a.contact_id '.
+      'FROM civicrm_address a '.
+      'LEFT JOIN '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
         'ON c.entity_id = a.contact_id '.
       'WHERE ('.
-          'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL OR '.
-          'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
+          'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
+          'OR c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
         ') '.
+        'AND a.geo_code_1 IS NOT NULL '.
+        'AND a.geo_code_1 <> ""'.
+        'AND a.country_id = '. CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID .' '.
+        'AND a.state_province_id <> '. CD_SUNLIGHT_CIVICRM_NON_US_STATE_PROVINCE_ID .' '.
         'AND ('.
-          'a.geo_code_1 IS NOT NULL AND '.
-          'a.geo_code_1 <> ""'.
-        ') AND '.
-        'a.country_id = '. CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID .' AND '.
-        'a.state_province_id <> '. CD_SUNLIGHT_CIVICRM_NON_US_STATE_PROVINCE_ID .' AND ('.
-          'a.postal_code IS NOT NULL OR '.
-          'a.street_address IS NOT NULL '.
-        ')'
+          'a.postal_code IS NOT NULL '.
+          'OR a.street_address IS NOT NULL '.
+        ')'.
+        // Some buggy versions of CiviCRM have addresses with no contact_id.
+        'AND a.contact_id IS NOT NULL '.
+        'AND a.contact_id <> ""'
       );
       db_set_active();
       while ($contact = db_fetch_object($res)) {

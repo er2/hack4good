@@ -80,50 +80,26 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     }
 
     // Create the contact.
-    $contact_new = array(
+    $contact_modified_parameters = array(
       'first_name' => 'Simpletest test',
       'last_name' => 'Simpletest test',
       'email' => 'simpletest@example.org',
       'contact_type' => 'Individual',
       'dupe_check' => FALSE,
-    );
-    $contact = civicrm_contact_add($contact_new);
-    if (civicrm_error($contact)) {
-      $this->fail('A CiviCRM contact could not be created.  This might happen if you '.
-        'have non-standard required fields or other restrictions on contacts.'.
-        var_export($contact_new, TRUE) . var_export($contact, TRUE));
-      return;
-    }
-
-    // Create the location.
-    // We are making an overly complex array here to be compatible with several versions of the
-    // CiviCRM API.
-    // This is really stoopid to begin with.  We should just be able to manipulate primary locations
-    // via the contact api.
-    $location_new = array(
-      'contact_id' => $contact['contact_id'],
-      'version'    => '3.0',
       'address' => array(
         '1' => array(
-          'location_type' => 'Home',
           'location_type_id' => 1,
           'is_primary' => TRUE,
           'postal_code' => '00501',
           'country_id' => CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID,
         ),
       ),
-      'location_type' => 'Home',
-      'location_type_id' => 1,
-      'is_primary' => TRUE,
-      'postal_code' => '00501',
-      'country_id' => CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID,
     );
-    require_once 'api/v2/Location.php';
-    $location =& civicrm_location_add($location_new);
-    if (civicrm_error($location)) {
-      $this->fail('A location could not be created for the contact.  This might happen if you '.
+    $contact = civicrm_contact_add($contact_modified_parameters);
+    if (civicrm_error($contact)) {
+      $this->fail('A CiviCRM contact could not be created.  This might happen if you '.
         'have non-standard required fields or other restrictions on contacts.'.
-        var_export($location_new, TRUE) . var_export($location, TRUE));
+        var_export($contact_modified_parameters, TRUE) . var_export($contact, TRUE));
       return;
     }
 
@@ -138,10 +114,9 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00501', 'A CiviCRM contact simpletest@example.org was created.');
     $this->verbose(
-      '$new_contact: '. var_export($contact_new, TRUE) .
-      '$contact: '. var_export($contact, TRUE) .
-      '$location_new: '. var_export($location_new, TRUE) .
-      '$location: '. var_export($location, TRUE));
+      '$contact_parameters: '. var_export($contact_modified_parameters, TRUE) .
+      '$contact: '. var_export($contact, TRUE) //.
+    );
 
     // Test that it was enqueued.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when created.');
@@ -155,30 +130,22 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY1', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
     $this->verbose(var_export($contact_search, TRUE) . var_export($contact, TRUE));
 
-    // Show warning because the CiviCRM API un-hacked will not work.
-    $this->pass('The remaining assertions will probably fail in CiviCRM 3.0 or earlier', 'Debug');
-
     // Edit the contact.
-    $location_update = array(
+    $contact_modified_parameters = array(
       'contact_id' => $contact['contact_id'],
-      'location_type' => 'Home',
-      'location_type_id' => 1,
-      'is_primary' => TRUE,
-      'postal_code' => '12345',
-      'version'    => '3.0',
+      'contact_type' => 'Individual',
       'address' => array(
         1 => array(
-          'location_type' => 'Home',
           'location_type_id' => 1,
           'is_primary' => TRUE,
           'postal_code' => '12345',
         ),
       ),
     );
-    $location = civicrm_location_update($location_update);
-    if (civicrm_error($location)) {
+    $contact_modified = civicrm_contact_add($contact_modified_parameters);
+    if (civicrm_error($contact)) {
       $this->fail('The CiviCRM contact could not be edited: '.
-        var_export($location_update, TRUE) . var_export($location, TRUE));
+        var_export($contact_modified_parameters, TRUE) . var_export($contact_modified, TRUE));
       return;
     }
 
@@ -188,8 +155,8 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $this->verbose(
       '$contact_search: '. var_export($contact_search, TRUE) .
       '$contact: '. var_export($contact, TRUE) .
-      '$location_update: '. var_export($location_update, TRUE) .
-      '$location: '. var_export($location, TRUE));
+      '$contact_modified_parameters: '. var_export($contact_modified_parameters, TRUE) .
+      '$contact_modified: '. var_export($contact_modified, TRUE));
 
     // Editing the postal code should re-enqueue the contact.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
