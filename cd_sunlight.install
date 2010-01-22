@@ -217,6 +217,14 @@ function cd_sunlight_uninstall() {
   // Remove tables.
   drupal_uninstall_schema('cd_sunlight');
 
+  // Remove variables.
+  variable_del('cd_sunlight_api_key');
+  variable_del('cd_sunlight_cron_load_limit');
+  variable_del('cd_sunlight_geocoding_off');
+  variable_del('cd_sunlight_geocode_username');
+  variable_del('cd_sunlight_http_auth_user');
+  variable_del('cd_sunlight_http_auth_password');
+  variable_del('cd_sunlight_api_key');
 }
 
 /**
