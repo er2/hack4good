@@ -106,6 +106,9 @@ function cd_sunlight_cron() {
     return;
   }
 
+  // Make sure that we won't hit MySQL connection timeouts.
+  _cd_sunlight_mysql_wait_timeout();
+
   // Process the queue.
   _cd_sunlight_process_queue();
 
@@ -2066,4 +2069,36 @@ function _cd_sunlight_backtrace() {
     $info[] = "$trace[file]($trace[line]): $trace[function]";
   }
   return var_export($info, TRUE);
+}
+
+/**
+ * Reconnect to DBs if necessary.
+ *
+ * Use this if you are running into "MySQL has gone away" errors.  These can happen especially
+ * during cron and anything else that takes more than 90 seconds.
+ */
+function _cd_sunlight_mysql_wait_timeout() {
+  global $db_type;
+  $ping_function = $db_type .'_ping';
+
+//  watchdog('cd_sunlight', 'Increasing MySQL wait timeout.', array(), WATCHDOG_INFO);
+
+  $old_db = db_set_active('civicrm');
+  $ping_function($GLOBALS['active_db']);
+  db_query('SET SESSION wait_timeout = 900');
+  db_query('SET SESSION interactive_timeout = 900');
+  db_set_active();
+  $ping_function($GLOBALS['active_db']);
+  db_query('SET SESSION wait_timeout = 900');
+  db_query('SET SESSION interactive_timeout = 900');
+
+  civicrm_initialize();
+  require_once('CRM/Core/DAO.php');
+  CRM_Core_DAO::executeQuery('SET SESSION wait_timeout = 900', CRM_Core_DAO::$_nullArray);
+  CRM_Core_DAO::executeQuery('SET SESSION interactive_timeout = 900', CRM_Core_DAO::$_nullArray);
+
+  if ($old_db && $old_db != 'default') {
+    db_set_active($old_db);
+  }
+
 }
