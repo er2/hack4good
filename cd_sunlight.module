@@ -14,7 +14,8 @@
  *    single digit districts shall have no leading zeros.
  *  zone - A region: either 'state' or 'cd'.
  *
- * @todo validate that data manually entered in a CiviCRM CD field fits our format.
+ * @todo Validate that data manually entered in a CiviCRM CD field fits our format.
+ * @todo Use batch API to expose an admin interface to batch process all contacts.
  */
 
 /**
@@ -358,6 +359,7 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
 
     // We queue new contacts here and not in hook_pre because they don't have a contact_id in
     // hook_pre.
+    // @todo We should only enqueue if the contact has address information.
     cd_sunlight_contact_enqueue($contact_id);
   }
   elseif ($op == 'edit') {
@@ -705,6 +707,7 @@ function cd_sunlight_cd_parse_district($cd) {
  *    CD_SUNLIGHT_CIVICRM_CD
  *    CD_SUNLIGHT_CIVICRM_CD_OVERRIDE
  * @return none
+ * @todo We should only enqueue contacts with enough address data.
  */
 function cd_sunlight_validate_civicrm_data($contact) {
 
@@ -762,22 +765,13 @@ function cd_sunlight_validate_civicrm_data($contact) {
 /**
  * Run the CiviCRM geocoding script.
  *
- * @param string $username
- *  CiviCRM cron scripts require authentication against a Drupal user/pass.
- * @param string $password
- *  CiviCRM cron scripts require authentication against a Drupal user/pass.
- *  Leave FALSE when running cron.
- * @param string $map_provider = 'Google'
- * @param string $map_API_key = ''
- *  your key, or 'googlemap_api_key' to use the key set by the GMap module.
- * @param mixed $number_of_contacts = 300
- *  The maximum number of contacts to be geocoded.
- *  'all' to geocode all contacts that do not have lat/long.
  * @return object
  *  an HTTP response object.  We've already logged the response, you can do further work with it
  *  if you'd like.
  */
-function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
+function cd_sunlight_contacts_geocode() {
+
+  variable_get('cd_sunlight_cron_contact_limit', 300);
 
   civicrm_initialize();
 
@@ -792,39 +786,44 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
       '<a href="!url">settings</a>.', array('!url' => '/admin/settings/cd_sunlight'), WATCHDOG_ERROR);
   }
 
-  watchdog('cd_sunlight', 'Batch geocoding CiviCRM contacts', array(), WATCHDOG_INFO);
-
-  // Get the start and end IDs.
-  if ($number_of_contacts == 'all') {
-    $start_id = 0;
+  // Get start and end IDs.
+  db_set_active('civicrm');
+  $start_id = db_result(db_query('SELECT contact_id
+    FROM civicrm_address
+    WHERE (geo_code_1 IS NULL OR geo_code_1 = 0)
+      AND country_id IS NOT NULL
+    ORDER BY contact_id
+    LIMIT 1'));
+  if (empty($start_id)) {
+    watchdog('cd_sunlight', 'No contacts to geocode.', array(), WATCHDOG_INFO);
+    return;
   }
-  else {
-    db_set_active('civicrm');
-    $start_id = db_result(db_query('SELECT contact_id
+  $end_id = db_result(db_query('SELECT MAX(contact_id)
+    FROM (
+      SELECT contact_id
       FROM civicrm_address
-      WHERE geo_code_1 is null
-        AND state_province_id IS NOT NULL
+      WHERE contact_id > %d
+        AND (geo_code_1 IS NULL OR geo_code_1 = 0)
         AND country_id IS NOT NULL
       ORDER BY contact_id
-      LIMIT 1'));
-    if (empty($start_id)) {
-      $start_id = 0;
-    }
-    $end_id = db_result(db_query('SELECT MAX(contact_id)
-      FROM (
-        SELECT contact_id
-        FROM civicrm_address a
-        INNER JOIN civicrm_state_province s
-          ON a.state_province_id = s.id
-        WHERE contact_id > %d
-          AND geo_code_1 IS NULL
-          AND a.country_id IS NOT NULL
-        ORDER BY contact_id
-        LIMIT %d
-      )a',
-      $start_id, $number_of_contacts));
-    db_set_active();
+      LIMIT %d
+    ) m',
+    $start_id, variable_get('cd_sunlight_cron_contact_limit', 300)));
+
+  // We must have an end ID, otherwise the script will spend all it's time just iterating through
+  // all records.  :(
+  $max_end_id = db_result(db_query('SELECT MAX(contact_id)
+    FROM (
+      SELECT contact_id
+      FROM civicrm_address a
+      WHERE contact_id > %d
+      ORDER BY contact_id
+      LIMIT %d
+    ) m', $start_id, 1000));
+  if (empty($end_id) || $end_id > $max_end_id) {
+    $end_id = $max_end_id;
   }
+  db_set_active();
 
   // Build script parameters.
   $query = array(
@@ -832,10 +831,8 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
     'pass' => CD_SUNLIGHT_GEOCODE_PASSWORD,
     'key' => CIVICRM_SITE_KEY,
     'start' => $start_id,
+    'end' => $end_id,
   );
-  if (!empty($end_id)) {
-    $query['end'] = $end_id;
-  }
   $query_string = drupal_query_string_encode($query);
   $script = drupal_get_path('module', 'civicrm') . '/../bin/UpdateAddress.php';
   $credentials = '';
@@ -850,22 +847,41 @@ function cd_sunlight_contacts_geocode($number_of_contacts = 300) {
   $url = str_replace('://', '://'. $credentials, $url);
 
   // Run the CiviCRM cron script.
-  $response = drupal_http_request($url, array(), 'GET', NULL, 3, 600);
+  watchdog(
+    'cd_sunlight', 'Batch geocoding @count CiviCRM contacts. IDs @ids.',
+    array(
+      '@count' => variable_get('cd_sunlight_cron_contact_limit', 300),
+      '@ids' => $start_id . ' through '. $end_id,
+    ),
+    WATCHDOG_INFO
+  );
+  $response = drupal_http_request($url, array(), 'GET', NULL, 3, 300);
 
   // Log results.
   if ($response->code == 200 && strpos($response->data, 'Addresses Geocoded :') !== FALSE) {
     watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_NOTICE);
   }
+  elseif (empty($response->code)) {
+    watchdog('cd_sunlight', 'Error during contact geocoding.  There was likely a timeout.  You '.
+      'may need to decrease the cron contact limit, and/or install <a href="!patch_url">this '.
+      'patch<a/>', array('!patch_url' => 'http://drupal.org/node/156582#comment-577135'),
+      WATCHDOG_ERROR);
+  }
   else {
+
     // Rebuild the URL without the key or password to give the admin some feedback.
     $query['pass'] = 'XXXX';
     $query['key'] = 'XXXX';
     $query_string = drupal_query_string_encode($query);
     $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
-    watchdog('cd_sunlight',
-      'Error during contact geocoding: %error',
-      array('%error' => $response->code . ': ' . $response->error . '; ' . $response->data . ' ' . $url),
-      WATCHDOG_ERROR);
+    watchdog(
+      'cd_sunlight',
+      'Error during contact geocoding: @error',
+      array(
+        '@error' => $response->code . ': ' . $response->error . ': ' . $url . '; ' . $response->data
+      ),
+      WATCHDOG_ERROR
+    );
   }
 
   return $response;
@@ -1078,7 +1094,6 @@ function _cd_sunlight_legislator_save($legislator) {
  *  A legislator array as returned from sunlight.
  * @return array
  *  The trimmed legislator
- * @todo we can now use schema API for this.
  */
 function _cd_sunlight_legislator_filter_fields($legislator) {
   static $fields = array();
@@ -1267,8 +1282,8 @@ function _cd_sunlight_legislators_apilookup($params) {
  *
  * @param array $contact
  *  Must have a contact_id.
- *  Must have postal_code/zip or latitude&longitude/geo_code_1&geo_code_2.
- *  street_address and country_id and state_province_id are suggested.
+ *  Must have postal_code or (geo_code_1 & geo_code_2).
+ *  street_address and country_id and state_province_id are recommended.
  * @return mixed
  *  FALSE on error
  *  NULL if there was not enough data passed in to perform a lookup
@@ -1301,18 +1316,16 @@ function _cd_sunlight_contact_apilookup($contact) {
     return NULL;
   }
 
-  $zip = !empty($contact['postal_code']) ? $contact['postal_code'] :
-    (!empty($contact['zip']) ? $contact['zip'] : '');
-  $latitude = !empty($contact['geo_code_1']) ? $contact['geo_code_1'] :
-    (!empty($contact['latitude']) ? $contact['latitude'] : '');
-  $longitude = !empty($contact['geo_code_2']) ? $contact['geo_code_2'] :
-    (!empty($contact['longitude']) ? $contact['longitude'] : '');
+  $postal_code = !empty($contact['postal_code']) ? $contact['postal_code'] : '';
+  $street_address = !empty($contact['street_address']) ? $contact['street_address'] : '';
+  $latitude = !empty($contact['geo_code_1']) ? $contact['geo_code_1'] : '';
+  $longitude = !empty($contact['geo_code_2']) ? $contact['geo_code_2'] : '';
   $contact_id = $contact['contact_id'];
 
   // Decide what method to call based on what paramaters we have.
   // Lat/Long is preferred, but can only be trusted if the contact has an address or postal code.
   // Otherwise the geocoding was based off city/state/country which is useless to us.
-  if (!empty($latitude) && !empty($longitude) && (!empty($zip) || !empty($street_address))) {
+  if (!empty($latitude) && !empty($longitude) && (!empty($postal_code) || !empty($street_address))) {
 
     // Contact ID is included for debugging purposes.
     // If there's an error it will show up in watchdog.
@@ -1333,7 +1346,7 @@ function _cd_sunlight_contact_apilookup($contact) {
         strpos($error_message, 'Invalid Parameter') !== FALSE
       )
     ) {
-      if (empty($zip)) {
+      if (empty($postal_code)) {
         return NULL;
       }
       watchdog('cd_sunlight',
@@ -1341,18 +1354,17 @@ function _cd_sunlight_contact_apilookup($contact) {
         array('@params' => var_export($params, TRUE)),
         WATCHDOG_NOTICE,
         l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $params['contact_id'])));
-      unset($contact['geo_code_1'], $contact['geo_code_2'],
-        $contact['latitude'], $contact['longitude']);
+      unset($contact['geo_code_1'], $contact['geo_code_2']);
       return _cd_sunlight_contact_apilookup($contact);
     }
 
   }
-  elseif (!empty($zip)) {
+  elseif (!empty($postal_code)) {
 
     // Contact ID is included for debugging purposes.
     // If there's an error it will show up in watchdog.
     $params = array(
-      'zip' => $zip,
+      'zip' => $postal_code,
       'contact_id' => $contact_id,
     );
     $cd_data = _cd_sunlight_api_lookup('districts.getDistrictsFromZip', $params);
@@ -1377,7 +1389,7 @@ function _cd_sunlight_contact_apilookup($contact) {
     return array();
   }
 
-  // There may be more than one CD per zip.
+  // @todo: There may be more than one CD per zip.
   // Right now we are just going to take the first one.  We might consider doing something else
   // later.
   $cd_data = current($cd_data);
@@ -1405,8 +1417,6 @@ function _cd_sunlight_contact_cd_update($contact_id) {
   $params = array(
     'contact_id' => $contact_id,
     'return.postal_code' => TRUE,
-    'return.latitude' => TRUE,
-    'return.longitude' => TRUE,
     'return.geo_code_1' => TRUE,
     'return.geo_code_2' => TRUE,
     'return.street_address' => TRUE,
@@ -1699,7 +1709,7 @@ function _cd_sunlight_state_list_with_non_voting_congresspersons() {
 }
 
 /**
- * Lookup and store CD for queued contacts.
+ * Lookup with Sunlight and store the CD for queued contacts.
  *
  * @return none
  */
@@ -1717,27 +1727,32 @@ function _cd_sunlight_process_queue() {
       'FROM civicrm_address a '.
       'LEFT JOIN '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
         'ON c.entity_id = a.contact_id '.
-      'WHERE ('.
+      'WHERE ( '.
           'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
           'OR c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
         ') '.
         'AND a.geo_code_1 IS NOT NULL '.
-        'AND a.geo_code_1 <> ""'.
+        'AND a.geo_code_1 <> 0 '.
         'AND a.country_id = '. CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID .' '.
         'AND a.state_province_id <> '. CD_SUNLIGHT_CIVICRM_NON_US_STATE_PROVINCE_ID .' '.
-        'AND ('.
-          'a.postal_code IS NOT NULL '.
-          'OR a.street_address IS NOT NULL '.
-        ')'.
+        'AND ( '.
+          '( '.
+            'a.postal_code IS NOT NULL AND '.
+            'a.postal_code <> "" '.
+          ') '.
+          'OR ( '.
+            'a.street_address IS NOT NULL AND '.
+            'a.street_address <> "" '.
+          ') '.
+        ') '.
         // Some buggy versions of CiviCRM have addresses with no contact_id.
         'AND a.contact_id IS NOT NULL '.
-        'AND a.contact_id <> ""'
-      );
-      db_set_active();
-      while ($contact = db_fetch_object($res)) {
-        cd_sunlight_contact_enqueue($contact->contact_id);
-      }
-
+        'AND a.contact_id <> 0'
+    );
+    db_set_active();
+    while ($contact = db_fetch_object($res)) {
+      cd_sunlight_contact_enqueue($contact->contact_id);
+    }
   }
 
   watchdog('cd_sunlight', 'Processing queued CD lookups', array(), WATCHDOG_INFO);
@@ -1745,7 +1760,8 @@ function _cd_sunlight_process_queue() {
   // Update our CDs.
   civicrm_initialize();
   require_once('api/v2/Contact.php');
-  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron}', 0, 300);
+  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron}', 0, 
+    variable_get('cd_sunlight_cron_contact_limit', 300));
   $x = 0;
   while ($queue = db_fetch_object($results)) {
 
@@ -1810,7 +1826,7 @@ function _cd_sunlight_cd_get_legislators($cd) {
 /**
  * Get all the contacts within the given CD
  *
- * @todo This may have big performance problems and may need to be cached.
+ * NOTE: This may have big performance problems.  You will likely need to cache the results.
  *
  * @param string $cd
  * @return array
@@ -1849,7 +1865,7 @@ function _cd_sunlight_cd_get_contacts($cd) {
 /**
  * Get all the users within the given CD
  *
- * @todo This may have big performance problems and may need to be cached.
+ * NOTE: This may have big performance problems.  You will likely need to cache the results.
  *
  * @param string $cd
  * @return array

@@ -225,6 +225,7 @@ function cd_sunlight_uninstall() {
   variable_del('cd_sunlight_http_auth_user');
   variable_del('cd_sunlight_http_auth_password');
   variable_del('cd_sunlight_api_key');
+  variable_del('cd_sunlight_cron_contact_limit');
 }
 
 /**

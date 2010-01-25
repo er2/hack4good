@@ -17,9 +17,16 @@ function cd_sunlight_settings_form() {
   $form['cd_sunlight_api_key'] = array(
     '#type' => 'textfield',
     '#title' => t('Sunlight API Key'),
-    '#description' => t('You can obtain your key from <a href="!url">Sunlight Labs</a>.'
+    '#description' => t('A key can be obtained from <a href="!url">Sunlight Labs</a>.'
       , array('!url' => url('http://services.sunlightlabs.com/api/'))),
     '#default_value' => variable_get('cd_sunlight_api_key', ''),
+    '#required' => TRUE,
+  );
+  $form['cd_sunlight_cron_contact_limit'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Cron contact limit'),
+    '#description' => t('The maximum number of contacts to process during cron.'),
+    '#default_value' => variable_get('cd_sunlight_cron_contact_limit', 300),
     '#required' => TRUE,
   );
   if (function_exists('sys_getloadavg')) {
@@ -38,18 +45,18 @@ function cd_sunlight_settings_form() {
     '#collapsed' => TRUE,
     '#collapsible' => TRUE,
     '#title' => 'Advanced Batch Geocoding',
-    '#description' => t('You should <a href="!url_geocode">enable geocoding within CiviCRM</a> '
+    '#description' => t('<a href="!url_geocode">Geocoding within CiviCRM</a> should be enabled '
       . "for more accurate determination of a contact's congressional district (some congressional "
-      . 'districts contain more than one zip code).  However geocoding can put a big load on your '
-      . 'server if you are ever saving several contacts per second from multiple HTTP requests. '
+      . 'districts contain more than one zip code).  However geocoding can put a big load on the '
+      . 'server if several contacts are saved per second from multiple HTTP requests. '
       . 'Instead CiviCRM Sunlight Congressional District has the ability to override CiviCRM and '
       . 'perform geocoding only in batches during cron and on any CiviCRM profiles used for '
-      . '"View/Edit User Account".  To use this feature you first must <a href="!url_setup">setup '
+      . '"View/Edit User Account".  To use this feature first <a href="!url_setup">setup '
       . ' a user, password and key for CiviCRM Command-line usage</a>. Enter these values below. '
-      . '<br />NOTE: 95% of sites will not require or see any benefit from batch geocoding.'
+      . '<br /><em>NOTE: 95% of sites will not require or see any benefit from batch geocoding.</em>'
       , array(
         '!url_geocode' => url('civicrm/admin/setting/mapping'),
-        '!url_setup' => url('http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration'),
+        '!url_setup' => 'http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration',
       )),
   );
   $form['geocode']['cd_sunlight_geocoding_off'] = array(
@@ -69,7 +76,7 @@ function cd_sunlight_settings_form() {
     '#value' => _cd_sunlight_crypt_enabled() ? 'Available' : 'Not available',
     '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the '
       . 'username. ', array(
-        '!url' => url('http://www.php.net/manual/en/book.mcrypt.php'),
+        '!url' => 'http://www.php.net/manual/en/book.mcrypt.php',
       )),
   );
   $form['geocode']['cd_sunlight_geocode_username'] = array(
@@ -84,7 +91,7 @@ function cd_sunlight_settings_form() {
     '#type' => 'item',
     '#title' => t('Password used in CiviCRM geocode script'),
     '#value' => defined('CD_SUNLIGHT_GEOCODE_PASSWORD') ? 'Is defined' : 'Is not defined',
-    '#description' => t('You must define the password in a constant called !const in settings.php',
+    '#description' => t('Define the password in a constant called !const in settings.php',
       array('!const' => 'CD_SUNLIGHT_GEOCODE_PASSWORD')),
     '#attributes' => array('autocomplete' => 'off'),
   );
@@ -110,8 +117,8 @@ function cd_sunlight_settings_form() {
   );
   $form['geocode']['test'] = array(
     '#type' => 'fieldset',
-    '#description' => t('You will need to resolve any issues shown here, or in <a href="!url">the '
-      . 'logs</a> (PHP timeouts, etc.) before batch geocoding will work. ', array(
+    '#description' => t('Any issues shown here, or in <a href="!url">the logs</a> (PHP timeouts, '.
+        'etc.) must be resolved before batch geocoding will work. ', array(
         '!url' => url('admin/reports/dblog'),
       )),
   );
@@ -147,6 +154,22 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
 
   // Revert.
   variable_set('cd_sunlight_api_key', $key_existing);
+
+  // Are the contact limit and load limit numeric?
+  if (!empty($form_state['values']['cd_sunlight_cron_contact_limit'])) {
+    $contact_limit = $form_state['values']['cd_sunlight_cron_contact_limit'];
+    if (!is_numeric($contact_limit) || (int)$contact_limit != $contact_limit) {
+      form_set_error('cd_sunlight_cron_contact_limit',
+        t('The contact limit must be an integer.'));
+    }
+  }
+  if (!empty($form_state['values']['cd_sunlight_cron_load_limit'])) {
+    $cron_limit = $form_state['values']['cd_sunlight_cron_load_limit'];
+    if (!is_numeric($cron_limit) || $cron_limit < 0) {
+      form_set_error('cd_sunlight_cron_load_limit',
+        t('The cron limit must be a positive numeric value.'));
+    }
+  }
 
   // Test the geocoding username.
   if ($user_name = $form_state['values']['cd_sunlight_geocode_username']) {
@@ -215,7 +238,7 @@ function cd_sunlight_settings_fields_form() {
   $form = array(
     '#prefix' => '<div>' . t(
       'CiviCRM Congressional District stores congressional district data for each CiviCRM '
-      . 'contact in a set of CiviCRM custom fields.  You create these fields <a href="!url">within '
+      . 'contact in a set of CiviCRM custom fields.  Create these fields <a href="!url">within '
       . 'CiviCRM</a>. ', array('!url' => url('civicrm/admin/custom/group'))) .'</div>' ,
   );
 
@@ -266,7 +289,7 @@ function cd_sunlight_settings_fields_form_validate($form, &$form_state) {
   db_set_active();
   if ($table_1 != $table_2) {
     form_set_error('field_cd_sunlight_civicrm_cd_override'
-      , t('You must choose two fields from the same group.'));
+      , t('Choose two fields from the same group.'));
   }
 }
 
