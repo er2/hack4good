@@ -324,3 +324,88 @@ function cd_sunlight_settings_fields_form_submit($form, &$form_state) {
   drupal_set_message(t('The fields have been saved.'));
 }
 
+/**
+ * Confirm that we will batch process all contacts.
+ */
+function cd_sunlight_batch_confirm() {
+  return confirm_form(array(),
+    t('Process all contacts'),
+    'admin/settings/cd_sunlight',
+    t('Are you sure you want to process all contacts, queuing those that require a Congressional '.
+      'District? This action iterates through all contacts in CiviCRM, and may be a lengthy process.'),
+    t('Process all contacts'),
+    t('Cancel')
+  );
+}
+
+/**
+ * Handler for batch confirmation.
+ */
+function cd_sunlight_batch_confirm_submit($form, &$form_state) {
+  $batch = array(
+    'operations' => array(array('cd_sunlight_batch', array())),
+    'finished' => 'cd_sunlight_batch_finished',
+    'title' => t('Processing CiviCRM contacts.'),
+    'init_message' => t('Starting.'),
+    'progress_message' => '',
+    'error_message' => t('An error occurred and some contacts have not been processed.'),
+    'file' => drupal_get_path('module', 'cd_sunlight') .'/cd_sunlight.admin.inc',
+  );
+  batch_set($batch);
+}
+
+/**
+ * Batch process all CiviCRM contacts using Batch API.
+ */
+function cd_sunlight_batch(&$context) {
+
+  // First time setup.
+  static $limit = 50;
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['contact_id'] = 0;
+    db_set_active('civicrm');
+    $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(*) FROM civicrm_contact'));
+    db_set_active();
+  }
+
+  // Iterate through the contacts.
+  db_set_active('civicrm');
+  $res = db_query('SELECT id
+    FROM civicrm_contact
+    WHERE id > %d
+    ORDER BY id LIMIT 0, '. $limit,
+    $context['sandbox']['contact_id']);
+  db_set_active();
+  while ($contact = db_fetch_array($res)) {
+    $contact = _cd_sunlight_civicrm_contact_get(array('contact_id' => $contact['id']));
+    if (civicrm_error($contact)) {
+      $context['success'] = FALSE;
+      $context['error_message'] = t('There was a CiviCRM API error. ');
+      return;
+    }
+    cd_sunlight_validate_civicrm_data($contact);
+    $context['sandbox']['contact_id'] = $contact['contact_id'];
+    $context['sandbox']['progress'] ++;
+    $context['message'] = t('Processed @progress of @max',
+      array('@progress' => $context['sandbox']['progress'], '@max' => $context['sandbox']['max']));
+  }
+
+  // Are we finished?
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+  $context['results'] = $context['sandbox']['progress'];
+
+}
+
+function cd_sunlight_batch_finished($success, $results, $operations) {
+  if ($success) {
+    $message = format_plural($results, 'One contact processed.', '@count contacts processed.');
+  }
+  else {
+    $message = t('Finished with an error.');
+  }
+  drupal_set_message($message);
+}
+

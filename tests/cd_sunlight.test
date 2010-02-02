@@ -26,7 +26,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
 
     // Install our modules.
     $args = func_get_args();
-    $modules = array_merge(array('cd_sunlight', 'civicrm', 'simpletest', 'devel'), $args);
+    $modules = array_merge(array('cd_sunlight', 'civicrm'), $args);
     call_user_func_array(array('parent', 'setUp'), $modules);
 
     // Turn CiviCRM geocoding off so that this doesn't fire when we process the queue.
@@ -99,7 +99,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     if (civicrm_error($contact)) {
       $this->fail('A CiviCRM contact could not be created.  This might happen if you '.
         'have non-standard required fields or other restrictions on contacts.'.
-        var_export($contact_modified_parameters, TRUE) . var_export($contact, TRUE));
+        $this->_var_export($contact_modified_parameters, TRUE) . $this->_var_export($contact, TRUE));
       return;
     }
 
@@ -114,8 +114,8 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00501', 'A CiviCRM contact simpletest@example.org was created.');
     $this->verbose(
-      '$contact_parameters: '. var_export($contact_modified_parameters, TRUE) .
-      '$contact: '. var_export($contact, TRUE) //.
+      '$contact_parameters: '. $this->_var_export($contact_modified_parameters, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE) //.
     );
 
     // Test that it was enqueued.
@@ -128,7 +128,7 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
     $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY1', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
-    $this->verbose(var_export($contact_search, TRUE) . var_export($contact, TRUE));
+    $this->verbose($this->_var_export($contact_search, TRUE) . $this->_var_export($contact, TRUE));
 
     // Edit the contact.
     $contact_modified_parameters = array(
@@ -145,7 +145,8 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $contact_modified = civicrm_contact_add($contact_modified_parameters);
     if (civicrm_error($contact)) {
       $this->fail('The CiviCRM contact could not be edited: '.
-        var_export($contact_modified_parameters, TRUE) . var_export($contact_modified, TRUE));
+        $this->_var_export($contact_modified_parameters, TRUE) .
+        $this->_var_export($contact_modified, TRUE));
       return;
     }
 
@@ -153,10 +154,10 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '12345', 'CiviCRM contact simpletest@example.org was edited.');
     $this->verbose(
-      '$contact_search: '. var_export($contact_search, TRUE) .
-      '$contact: '. var_export($contact, TRUE) .
-      '$contact_modified_parameters: '. var_export($contact_modified_parameters, TRUE) .
-      '$contact_modified: '. var_export($contact_modified, TRUE));
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE) .
+      '$contact_modified_parameters: '. $this->_var_export($contact_modified_parameters, TRUE) .
+      '$contact_modified: '. $this->_var_export($contact_modified, TRUE));
 
     // Editing the postal code should re-enqueue the contact.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
@@ -169,8 +170,98 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
     $contact = _cd_sunlight_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY21', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
     $this->verbose(
-      '$contact_search: '. var_export($contact_search, TRUE) .
-      '$contact: '. var_export($contact, TRUE));
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE));
+
+    // Give the contact a bogus Zip code.
+    $contact_modified_parameters = array(
+      'contact_id' => $contact['contact_id'],
+      'contact_type' => 'Individual',
+      'address' => array(
+        1 => array(
+          'location_type_id' => 1,
+          'is_primary' => TRUE,
+          'postal_code' => '00000',
+        ),
+      ),
+    );
+    $contact_modified = civicrm_contact_add($contact_modified_parameters);
+    if (civicrm_error($contact)) {
+      $this->fail('The CiviCRM contact could not be edited: '.
+        $this->_var_export($contact_modified_parameters, TRUE) .
+        $this->_var_export($contact_modified, TRUE));
+      return;
+    }
+
+    // We should have the new postal code.
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
+    $this->assertEqual($contact['postal_code'], '00000', 'CiviCRM contact simpletest@example.org was edited.');
+    $this->verbose(
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE) .
+      '$contact_modified_parameters: '. $this->_var_export($contact_modified_parameters, TRUE) .
+      '$contact_modified: '. $this->_var_export($contact_modified, TRUE));
+
+    // Editing the postal code should re-enqueue the contact.
+    $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
+
+    // Process the queue, our contact should be processed.
+    variable_set('cd_sunlight_geocoding_off', FALSE);
+    _cd_sunlight_process_queue();
+    variable_set('cd_sunlight_geocoding_off', TRUE);
+    $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
+    // The old CD should remain in place.
+    $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'NY21', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
+    $this->verbose(
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE));
+
+    // Give the contact a bogus Zip code and remove the old CD.
+    $contact_modified_parameters = array(
+      'contact_id' => $contact['contact_id'],
+      'contact_type' => 'Individual',
+      CD_SUNLIGHT_CIVICRM_CD => '',
+      'address' => array(
+        1 => array(
+          'location_type_id' => 1,
+          'is_primary' => TRUE,
+          'postal_code' => '00001',
+        ),
+      ),
+    );
+    $contact_modified = civicrm_contact_add($contact_modified_parameters);
+    if (civicrm_error($contact)) {
+      $this->fail('The CiviCRM contact could not be edited: '.
+        $this->_var_export($contact_modified_parameters, TRUE) .
+        $this->_var_export($contact_modified, TRUE));
+      return;
+    }
+
+    // We should have the new postal code and the CD should be gone.
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
+    $this->assertEqual($contact['postal_code'], '00001', 'CiviCRM contact simpletest@example.org was edited.');
+    $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], '', 'CiviCRM contact simpletest@example.org CD was removed.');
+    $this->verbose(
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE) .
+      '$contact_modified_parameters: '. $this->_var_export($contact_modified_parameters, TRUE) .
+      '$contact_modified: '. $this->_var_export($contact_modified, TRUE));
+
+    // Editing the postal code should re-enqueue the contact.
+    $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
+
+    // Process the queue, our contact should be processed.
+    variable_set('cd_sunlight_geocoding_off', FALSE);
+    _cd_sunlight_process_queue();
+    variable_set('cd_sunlight_geocoding_off', TRUE);
+    $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
+    $contact = _cd_sunlight_civicrm_contact_get($contact_search);
+    // The old CD should remain in place.
+    $this->assertEqual($contact[CD_SUNLIGHT_CIVICRM_CD], 'not found', 'Contact CD is '. $contact[CD_SUNLIGHT_CIVICRM_CD]);
+    $this->verbose(
+      '$contact_search: '. $this->_var_export($contact_search, TRUE) .
+      '$contact: '. $this->_var_export($contact, TRUE));
 
     // Cleanup. Delete the contact.
     $result = civicrm_contact_delete($contact);
@@ -185,8 +276,18 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
    *
    * @param int $contact_id
    */
-  function _checkQueue($contact_id) {
+  private function _checkQueue($contact_id) {
     return db_result(db_query('SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d', $contact_id));
+  }
+
+  /**
+   * Print out a variable for HTML display.
+   *
+   * @param mixed $variable
+   * @return string
+   */
+  private function _var_export($variable) {
+    return nl2br(var_export($variable, TRUE));
   }
 
 }

@@ -25,7 +25,7 @@
 // The table in CiviCRM that contains our custom Congressional District fields.
 define('CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE', variable_get('cd_sunlight_civicrm_custom_table', ''));
 
-// The name of the field in CiviCRM that contains the CD (custom_N). Should be read-only in the UI.
+// The name of the field in CiviCRM that contains the CD 'custom_N'. Should be read-only in the UI.
 // Needs to be a Alphanumeric-text.
 define('CD_SUNLIGHT_CIVICRM_CD', variable_get('cd_sunlight_civicrm_cd', ''));
 
@@ -80,6 +80,15 @@ function cd_sunlight_menu() {
     'weight' => '2',
     'file' => 'cd_sunlight.admin.inc',
   );
+  $items['admin/settings/cd_sunlight/batch'] = array(
+    'title' => 'Batch process',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cd_sunlight_batch_confirm'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => '3',
+    'file' => 'cd_sunlight.admin.inc',
+  );
   return $items;
 }
 
@@ -122,81 +131,6 @@ function cd_sunlight_cron() {
     variable_set('cd_sunlight_last_process_new_regions', $time);
   }
 
-}
-
-/**
- * Implementation of hook_requriements().
- */
-function cd_sunlight_requirements($phase) {
-  global $db_url;
-  $requirements = array();
-  if ($phase == 'runtime') {
-
-    // Raise an error if a there is no db_url entry for civicrm.
-    if (!is_array($db_url) || !isset($db_url['civicrm'])) {
-      $requirements['cd_sunlight_db'] = array(
-        'title' => 'CD Sunlight',
-        'description' => t('In settings.php $db_url must be an array and you must have an element '.
-          'in $db_url for "civicrm"!'),
-        'severity' => REQUIREMENT_ERROR,
-        'value' => t('settings.php issue'),
-      );
-    }
-
-    // Raise an error if a the module has not been setup.
-    if (
-      !variable_get('cd_sunlight_api_key', '') ||
-      !variable_get('cd_sunlight_civicrm_cd', '') ||
-      !variable_get('cd_sunlight_civicrm_cd_override', '')
-    ) {
-      $requirements['cd_sunlight_setup'] = array(
-        'title' => 'CiviCRM Sunlight Congressional District',
-        'description' => t('You have not <a href="!url">configured</a> the module.'
-          , array('!configured' => url('/admin/settings/cd_sunlight'))),
-        'severity' => REQUIREMENT_ERROR,
-        'value' => t('Not configured'),
-      );
-    }
-
-    // Report the number of records in the lookup queue.
-    $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron}'));
-    $requirements['cd_sunlight_count'] = array(
-      'title' => 'CiviCRM Sunlight Congressional District',
-      'value' => t('There are !count contacts in the queue for a CD lookup.',
-        array('!count' => $count)),
-      'count' => $count,
-      'severity' => REQUIREMENT_INFO
-    );
-
-    // Report the number of records in the batch geocoding queue.
-    if (variable_get('cd_sunlight_geocoding_off', FALSE)) {
-      db_set_active('civicrm');
-      $count = db_result(db_query('SELECT COUNT(*) FROM civicrm_address
-        WHERE geo_code_1 IS NULL
-          AND country_id IS NOT NULL
-          AND state_province_id IS NOT NULL'));
-      db_set_active();
-      $requirements['cd_sunlight_geocode_count'] = array(
-        'title' => 'CiviCRM Contact GeoCoding',
-        'value' => t('There are !count contacts in the queue to be geocoded.',
-          array('!count' => $count)),
-        'count' => $count,
-        'severity' => REQUIREMENT_INFO
-      );
-    }
-
-    // Report an error if there are no legislators (cron needs to be run).
-    if (!_cd_sunlight_legislators_exist()) {
-      $requirements['cd_sunlight_legislators_exist'] = array(
-        'title' => 'Members of Congress',
-        'value' => 'Do not exist',
-        'description' => t('Run cron to retrieve members of Congress from Sunlight.'),
-        'severity' => REQUIREMENT_ERROR,
-      );
-    }
-
-  }
-  return $requirements;
 }
 
 /**
@@ -914,6 +848,10 @@ function _cd_sunlight_validate_cd(&$cd) {
     $cd = '';
     return TRUE;
   }
+  // Our "not found" placeholder.
+  if ($cd == 'not found') {
+    return TRUE;
+  }
 
   // Remove non-alphanumerics.
   $cd = preg_replace("/[^a-zA-Z0-9]/", '', $cd);
@@ -1450,9 +1388,9 @@ function _cd_sunlight_contact_cd_update($contact_id) {
   elseif (empty($cd_data)) {
     // No CD was found by Sunlight.
     // This part is tricky, since we want to keep the old CD if the user wiped their address,
-    // But if this is a brand-new lookup, then we should save '' to the field.
-    if (!isset($contact[CD_SUNLIGHT_CIVICRM_CD]) || $contact[CD_SUNLIGHT_CIVICRM_CD] === NULL) {
-      $cd = '';
+    // But if this is a brand-new lookup, then we should save 'not found' to the field.
+    if (!isset($contact[CD_SUNLIGHT_CIVICRM_CD]) || empty($contact[CD_SUNLIGHT_CIVICRM_CD])) {
+      $cd = 'not found';
     }
     else {
       cd_sunlight_contact_dequeue($contact_id);
@@ -1595,6 +1533,10 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
   $url = url('http://services.sunlightlabs.com/api/'. $method .'.json', array('query' => $query));
   $response = drupal_http_request($url);
 
+  // Increment our counter.
+  $total_lookups = variable_get('cd_sunlight_total_lookups', 0);
+  variable_set('cd_sunlight_total_lookups', ++$total_lookups);
+
   if ($response->code == 400) {
     // The connection was successful, but Sunlight encountered an error.
     // When Sunlight encounters an error it sends code 400 and an error message in the data.
@@ -1604,7 +1546,7 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
   }
   elseif (!empty($response->error) || $response->code != 200) {
     // The connection was unsuccessful for whatever reason.
-    watchdog('cd_sunlight', 'Connection to Sunlight was unsuccessful: @code : @data',
+    watchdog('cd_sunlight', 'Connection to Sunlight was unsuccessful.  Your key may be disabled.: @code : @data',
       array('@data' => $response->error, '@code' => $response->code), WATCHDOG_ERROR);
     $error_message = t('Connection to Sunlight was unsuccessful: @code', array('@code' => $response->code));
     return FALSE;

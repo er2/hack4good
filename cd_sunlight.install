@@ -198,6 +198,90 @@ function cd_sunlight_schema() {
   return $schema;
 }
 
+
+/**
+ * Implementation of hook_requriements().
+ */
+function cd_sunlight_requirements($phase) {
+  global $db_url;
+  $requirements = array();
+  if ($phase == 'runtime') {
+
+    // Raise an error if a there is no db_url entry for civicrm.
+    if (!is_array($db_url) || !isset($db_url['civicrm'])) {
+      $requirements['cd_sunlight_db'] = array(
+        'title' => 'CD Sunlight',
+        'description' => t('In settings.php $db_url must be an array and you must have an element '.
+          'in $db_url for "civicrm"!'),
+        'severity' => REQUIREMENT_ERROR,
+        'value' => t('settings.php issue'),
+      );
+    }
+
+    // Raise an error if a the module has not been setup.
+    if (
+      !variable_get('cd_sunlight_api_key', '') ||
+      !variable_get('cd_sunlight_civicrm_cd', '') ||
+      !variable_get('cd_sunlight_civicrm_cd_override', '')
+    ) {
+      $requirements['cd_sunlight_setup'] = array(
+        'title' => 'CiviCRM Sunlight Congressional District',
+        'description' => t('You have not <a href="!url">configured</a> the module.'
+          , array('!configured' => url('/admin/settings/cd_sunlight'))),
+        'severity' => REQUIREMENT_ERROR,
+        'value' => t('Not configured'),
+      );
+    }
+
+    // Report the number of lookups ever performed.
+    $requirements['cd_sunlight_total_lookups'] = array(
+      'title' => 'CiviCRM Sunlight Congressional District lookups',
+      'value' => t('A total of !count lookups to Sunlight have been performed.',
+        array('!count' => variable_get('cd_sunlight_total_lookups', 0))),
+      'severity' => REQUIREMENT_INFO
+    );
+
+    // Report the number of records in the lookup queue.
+    $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron}'));
+    $requirements['cd_sunlight_count'] = array(
+      'title' => 'CiviCRM Sunlight Congressional District queue',
+      'value' => t('There are !count contacts in the queue for a CD lookup.',
+        array('!count' => $count)),
+      'count' => $count,
+      'severity' => REQUIREMENT_INFO
+    );
+
+    // Report the number of records in the batch geocoding queue.
+    if (variable_get('cd_sunlight_geocoding_off', FALSE)) {
+      db_set_active('civicrm');
+      $count = db_result(db_query('SELECT COUNT(*) FROM civicrm_address
+        WHERE geo_code_1 IS NULL
+          AND country_id IS NOT NULL
+          AND state_province_id IS NOT NULL'));
+      db_set_active();
+      $requirements['cd_sunlight_geocode_count'] = array(
+        'title' => 'CiviCRM Contact GeoCoding',
+        'value' => t('There are !count contacts in the queue to be geocoded.',
+          array('!count' => $count)),
+        'count' => $count,
+        'severity' => REQUIREMENT_INFO
+      );
+    }
+
+    // Report an error if there are no legislators (cron needs to be run).
+    if (!_cd_sunlight_legislators_exist()) {
+      $requirements['cd_sunlight_legislators_exist'] = array(
+        'title' => 'Members of Congress',
+        'value' => 'Do not exist',
+        'description' => t('Run cron to retrieve members of Congress from Sunlight.'),
+        'severity' => REQUIREMENT_ERROR,
+      );
+    }
+
+  }
+  return $requirements;
+}
+
 /**
  * Implementation of hook_install().
  *
@@ -226,72 +310,7 @@ function cd_sunlight_uninstall() {
   variable_del('cd_sunlight_http_auth_password');
   variable_del('cd_sunlight_api_key');
   variable_del('cd_sunlight_cron_contact_limit');
-}
-
-/**
- * Install tables if they don't exist.
- */
-function cd_sunlight_update_1() {
-  $ret = array();
-  if (!db_table_exists('cd_sunlight_cron')) {
-    cd_sunlight_install();
-    $ret[] = array('success' => TRUE, 'query' => 'Created cd_sunlight tables');
-  }
-  return $ret;
-}
-
-/**
- * Check that all our existing data validates.
- */
-function cd_sunlight_update_2() {
-
-  // Multi-part update
-  static $limit = 50;
-  if (!isset($_SESSION['cd_sunlight_update_2_contact_id'])) {
-    $_SESSION['cd_sunlight_update_2_contact_id'] = 0;
-    db_set_active('civicrm');
-    $_SESSION['cd_sunlight_update_2_max'] = db_result(
-      db_query('SELECT MAX(entity_id) FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE)
-    );
-    db_set_active();
-  }
-
-  // Iterate through the contacts.
-  db_set_active('civicrm');
-  $res = db_query(
-    'SELECT entity_id as contact_id, '.
-    CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS '. CD_SUNLIGHT_CIVICRM_CD .', '.
-    CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS '. CD_SUNLIGHT_CIVICRM_CD_OVERRIDE .
-    ' FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .
-    ' WHERE ('. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NOT NULL '.
-    '  OR '.  CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' IS NOT NULL) '.
-    '  AND entity_id > '. $_SESSION['cd_sunlight_update_2_contact_id'] .
-    ' ORDER BY entity_id '.
-    ' LIMIT 0, '. $limit
-  );
-  db_set_active();
-  while ($contact = db_fetch_array($res)) {
-    cd_sunlight_validate_civicrm_data($contact);
-    $_SESSION['cd_sunlight_update_2_contact_id'] = $contact['contact_id'];
-  }
-
-  // Are we finished?
-  if ($_SESSION['cd_sunlight_update_2_contact_id'] == $_SESSION['cd_sunlight_update_2_max']) {
-    unset($_SESSION['cd_sunlight_update_2_contact_id']);
-    unset($_SESSION['cd_sunlight_update_2_max']);
-    return array();
-  }
-  return array(
-    '#finished' => $_SESSION['cd_sunlight_update_2_contact_id'] / $_SESSION['cd_sunlight_update_2_max']
-  );
-}
-
-/**
- * Removed.
- */
-function cd_sunlight_update_3() {
-  $ret = array();
-  return $ret;
+  variable_del('cd_sunlight_total_lookups');
 }
 
 /**
