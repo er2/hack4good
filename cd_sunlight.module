@@ -15,7 +15,6 @@
  *  zone - A region: either 'state' or 'cd'.
  *
  * @todo Validate that data manually entered in a CiviCRM CD field fits our format.
- * @todo Use batch API to expose an admin interface to batch process all contacts.
  */
 
 /**
@@ -484,6 +483,9 @@ function cd_sunlight_cd_load($cd, $return_properties = array('legislators')) {
   $return_properties = drupal_map_assoc($return_properties);
 
   // Sanity checking.
+  if ($cd == 'not found') {
+    return array();
+  }
   if (!_cd_sunlight_validate_cd($cd)) {
     watchdog('cd_sunlight', 'Improper parameters for cd_sunlight_cd_load().', array(),
       WATCHDOG_ERROR);
@@ -615,6 +617,9 @@ function cd_sunlight_legislators_get($params = array(), $order_by = array('state
  *  ex. 'NY'
  */
 function cd_sunlight_cd_parse_state($cd) {
+  if ($cd == 'not_found') {
+    return '';
+  }
   return drupal_substr($cd, 0, 2);
 }
 
@@ -627,6 +632,9 @@ function cd_sunlight_cd_parse_state($cd) {
  *  ex. 17
  */
 function cd_sunlight_cd_parse_district($cd) {
+  if ($cd == 'not_found') {
+    return '';
+  }
   // Note that we can't use substr($cd, -2) because the district might only be one digit.
   return drupal_substr($cd, 2);
 }
@@ -639,12 +647,8 @@ function cd_sunlight_cd_parse_district($cd) {
  * the contact will be updated with the new string.
  *
  * @param array $contact
- *  Does not need to be a full CiviCRM contact.  Just a simple array with keys for
- *    contact_id
- *    CD_SUNLIGHT_CIVICRM_CD
- *    CD_SUNLIGHT_CIVICRM_CD_OVERRIDE
+ *  A full CiviCRM contact with address data
  * @return none
- * @todo We should only enqueue contacts with enough address data.
  */
 function cd_sunlight_validate_civicrm_data($contact) {
 
@@ -659,7 +663,9 @@ function cd_sunlight_validate_civicrm_data($contact) {
 
   // If the CD has never been looked up, then queue for lookup.
   if ($cd === NULL) {
-    cd_sunlight_contact_enqueue($contact['contact_id']);
+    if (!empty($contact['street_address']) || !empty($contact['postal_code'])) {
+      cd_sunlight_contact_enqueue($contact['contact_id']);
+    }
     return;
   }
 
@@ -668,7 +674,9 @@ function cd_sunlight_validate_civicrm_data($contact) {
     $cd = ($cd_is_valid ? $cd : '');
     $cd_override = ($cd_override_is_valid ? $cd_override : '');
     _cd_sunlight_contact_set_cd($contact['contact_id'], $cd, $cd_override);
-    cd_sunlight_contact_enqueue($contact['contact_id']);
+    if (!empty($contact['street_address']) || !empty($contact['postal_code'])) {
+      cd_sunlight_contact_enqueue($contact['contact_id']);
+    }
     return;
   }
 
