@@ -23,12 +23,6 @@ API.
   District will be retrieved the next time cron is run.
 
 
-* BATCH PROCESSING *
-You can batch process all contacts in CiviCRM (while reviewing them for any format issues with the
-existing stored values) by running update.php and manually choosing update #2.
-TODO: create an admin tab for this and use Batch API.
-
-
 * USING THE API *
 Here are the functions.  See the docbook comments for more info.
 cd_sunlight_contact_enqueue($contact_id) 
@@ -61,4 +55,3 @@ http://advomatic.com
 * SPONSORED BY *
 Democrats.com
 http://democrats.com
-

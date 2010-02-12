@@ -26,7 +26,7 @@ function cd_sunlight_settings_form() {
     '#type' => 'textfield',
     '#title' => t('Cron contact limit'),
     '#description' => t('The maximum number of contacts to process during cron.'),
-    '#default_value' => variable_get('cd_sunlight_cron_contact_limit', 300),
+    '#default_value' => variable_get('cd_sunlight_cron_contact_limit', 200),
     '#required' => TRUE,
   );
   if (function_exists('sys_getloadavg')) {
@@ -387,14 +387,14 @@ function cd_sunlight_batch(&$context) {
     cd_sunlight_validate_civicrm_data($contact);
     $context['sandbox']['contact_id'] = $contact['contact_id'];
     $context['sandbox']['progress'] ++;
-    $context['message'] = t('Processed @progress of @max',
-      array('@progress' => $context['sandbox']['progress'], '@max' => $context['sandbox']['max']));
   }
 
   // Are we finished?
-  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+  if ($context['sandbox']['progress'] < $context['sandbox']['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
+  $context['message'] = t('Processed @progress of @max',
+    array('@progress' => $context['sandbox']['progress'], '@max' => $context['sandbox']['max']));
   $context['results'] = $context['sandbox']['progress'];
 
 }

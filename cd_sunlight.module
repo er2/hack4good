@@ -14,7 +14,6 @@
  *    single digit districts shall have no leading zeros.
  *  zone - A region: either 'state' or 'cd'.
  *
- * @todo Validate that data manually entered in a CiviCRM CD field fits our format.
  */
 
 /**
@@ -194,6 +193,10 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
     else {
       // Address is not here.
       $backtrace = _cd_sunlight_backtrace();
+      // What may have happened is that the CiviCRM API was called with no address data.
+      if (strpos($backtrace[5], 'api/v2/Contact.php') !== FALSE) {
+        return TRUE;
+      }
       watchdog('cd_sunlight', 'Error durring hook_civicrm_pre() This version of CiviCRM might not '.
         'be supported. @backtrace @ref',
         array('@backtrace' => $backtrace, '@ref' => var_export($_ref, TRUE)),
@@ -716,7 +719,7 @@ function cd_sunlight_validate_civicrm_data($contact) {
  */
 function cd_sunlight_contacts_geocode() {
 
-  variable_get('cd_sunlight_cron_contact_limit', 300);
+  variable_get('cd_sunlight_cron_contact_limit', 200);
 
   civicrm_initialize();
 
@@ -733,15 +736,30 @@ function cd_sunlight_contacts_geocode() {
 
   // Get start and end IDs.
   db_set_active('civicrm');
+  // CiviCRM has a bug where because it doesn't save a special value for addresses that fail geocoding,
+  // it ends up processing the same records over and over again.  So to get around this we will choose a
+  // random contact_id to start with.
+  $max_id = db_result(db_query('SELECT MAX(id) FROM civicrm_contact'));
+  $random_id = mt_rand(1, $max_id);
   $start_id = db_result(db_query('SELECT contact_id
     FROM civicrm_address
     WHERE (geo_code_1 IS NULL OR geo_code_1 = 0)
       AND country_id IS NOT NULL
+      AND contact_id > %d
     ORDER BY contact_id
-    LIMIT 1'));
+    LIMIT 1', $random_id));
   if (empty($start_id)) {
-    watchdog('cd_sunlight', 'No contacts to geocode.', array(), WATCHDOG_INFO);
-    return;
+    // None found.  Are there any records to geocode?
+    $start_id = db_result(db_query('SELECT contact_id
+      FROM civicrm_address
+      WHERE (geo_code_1 IS NULL OR geo_code_1 = 0)
+        AND country_id IS NOT NULL
+      ORDER BY contact_id
+      LIMIT 1'));
+    if (empty($start_id)) {
+      watchdog('cd_sunlight', 'No contacts to geocode.', array(), WATCHDOG_INFO);
+      return;
+    }
   }
   $end_id = db_result(db_query('SELECT MAX(contact_id)
     FROM (
@@ -753,7 +771,7 @@ function cd_sunlight_contacts_geocode() {
       ORDER BY contact_id
       LIMIT %d
     ) m',
-    $start_id, variable_get('cd_sunlight_cron_contact_limit', 300)));
+    $start_id, variable_get('cd_sunlight_cron_contact_limit', 200)));
 
   // We must have an end ID, otherwise the script will spend all it's time just iterating through
   // all records.  :(
@@ -795,12 +813,12 @@ function cd_sunlight_contacts_geocode() {
   watchdog(
     'cd_sunlight', 'Batch geocoding @count CiviCRM contacts. IDs @ids.',
     array(
-      '@count' => variable_get('cd_sunlight_cron_contact_limit', 300),
+      '@count' => variable_get('cd_sunlight_cron_contact_limit', 200),
       '@ids' => $start_id . ' through '. $end_id,
     ),
     WATCHDOG_INFO
   );
-  $response = drupal_http_request($url, array(), 'GET', NULL, 3, 300);
+  $response = drupal_http_request($url, array(), 'GET', NULL, 3, 200);
 
   // Log results.
   if ($response->code == 200 && strpos($response->data, 'Addresses Geocoded :') !== FALSE) {
@@ -1680,6 +1698,7 @@ function _cd_sunlight_process_queue() {
       'FROM civicrm_address a '.
       'LEFT JOIN '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
         'ON c.entity_id = a.contact_id '.
+          'AND a.is_primary = 1 '.
       'WHERE ( '.
           'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
           'OR c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
@@ -1713,8 +1732,8 @@ function _cd_sunlight_process_queue() {
   // Update our CDs.
   civicrm_initialize();
   require_once('api/v2/Contact.php');
-  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron}', 0, 
-    variable_get('cd_sunlight_cron_contact_limit', 300));
+  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron}', 0,
+    variable_get('cd_sunlight_cron_contact_limit', 200));
   $x = 0;
   while ($queue = db_fetch_object($results)) {
 
@@ -1726,7 +1745,7 @@ function _cd_sunlight_process_queue() {
     $x++;
   }
   if ($x > 0) {
-    watchdog('cd_sunlight', 'Cron has processed '. $x .' records.');
+    watchdog('cd_sunlight', 'Cron has processed '. $x .' records.', NULL, WATCHDOG_INFO);
   }
 }
 
@@ -2016,7 +2035,22 @@ function _cd_sunlight_backtrace() {
   $backtrace = debug_backtrace();
   $info = array();
   foreach ($backtrace as $trace) {
-    $info[] = "$trace[file]($trace[line]): $trace[function]";
+
+    // Add args to our trace, placeholders for non-scalars.
+    $arg_scalars = array();
+    $arg_string = '';
+    if (!empty($trace['args'])) {
+      foreach ($trace['args'] as $arg) {
+        if (!is_scalar($arg)) {
+          $arg_scalars[] = '#non-scalar#';
+        }
+        else {
+          $arg_scalars[] = $arg;
+        }
+      }
+      $arg_string = '('. implode(', ', $arg_scalars) .')';
+    }
+    $info[] = "$trace[file]($trace[line]): $trace[function]$arg_string";
   }
   return var_export($info, TRUE);
 }
