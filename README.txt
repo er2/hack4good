@@ -4,6 +4,7 @@ $Id$
 
 
 * ABOUT *
+
 This module provides a way to automatically get congressional district information about your
 contacts into CiviCRM using the Sunlight API.
 http://wiki.sunlightlabs.com/Sunlight_API_Documentation
@@ -12,18 +13,29 @@ API.
 
 
 * INSTALL *
-1)Configure the module at admin/settings/cd_sunlight
-2)Make sure you have an entry in db_url for civicrm in your settings.php file.  Something like:
-  $db_url = array(
-    'default' => 'mysqli://user:pass@localhost/drupal',
-    'civicrm' => 'mysqli://user:pass@localhost/civicrm',
-  );
-3)Navigate to admin >> logs >> status to see if the module is reporting any problems.
-4)Edit a contact and change the postal code to enqueue the contact for lookup.  The Congressional 
+
+1)Configure the module at /admin/settings/cd_sunlight
+  Specifically the Sunlight API key.
+
+2)Link with CiviCRM fields as /admin/settings/cd_sunlight/fields
+
+3)Make sure you have an entry in db_url for civicrm in your settings.php file.  Something like:
+    $db_url = array(
+      'default' => 'mysqli://user:pass@localhost/drupal',
+      'civicrm' => 'mysqli://user:pass@localhost/civicrm',
+    );
+  Make sure to use the same schema for both database ULRs (mysqli, mysql, pgsql).
+
+4)Navigate to /admin/reports/status to see if the module is reporting any problems.
+
+5)Batch process all contacts at /admin/settings/cd_sunlight/batch
+
+6)Edit a contact and change the postal code to enqueue the contact for lookup.  The Congressional
   District will be retrieved the next time cron is run.
 
 
 * USING THE API *
+
 Here are the functions.  See the docbook comments for more info.
 cd_sunlight_contact_enqueue($contact_id) 
 cd_sunlight_contact_dequeue($contact_id) 
@@ -43,15 +55,18 @@ cd_sunlight_cd_parse_district($cd)
 
 
 * CONGRESS MODULE *
+
 The congress module is an example implementation of the API.  It provides a few blocks and a user
 tab showing members of congress. 
 
 
 * DEVELOPED BY *
+
 Advomatic LLC
 http://advomatic.com
 
 
 * SPONSORED BY *
+
 Democrats.com
 http://democrats.com

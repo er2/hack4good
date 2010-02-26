@@ -236,10 +236,11 @@ function cd_sunlight_settings_fields_form() {
 
   // Form.
   $form = array(
-    '#prefix' => '<div>' . t(
+    '#prefix' => '<p>' . t(
       'CiviCRM Congressional District stores congressional district data for each CiviCRM '
-      . 'contact in a set of CiviCRM custom fields.  Create these fields <a href="!url">within '
-      . 'CiviCRM</a>. ', array('!url' => url('civicrm/admin/custom/group'))) .'</div>' ,
+      . 'contact in a set of CiviCRM custom fields.  First create these fields <a href="!url">within '
+      . 'CiviCRM</a> according to the descriptions below. ',
+      array('!url' => url('civicrm/admin/custom/group'))) .'</p>' ,
   );
 
   $field_cd_sunlight_civicrm_cd = variable_get('cd_sunlight_civicrm_cd', '');
@@ -250,9 +251,10 @@ function cd_sunlight_settings_fields_form() {
     '#title' => 'Congressional District Field',
     '#default_value' => check_plain($field_cd_sunlight_civicrm_cd),
     '#options' => $fields,
-    '#description' => t('Create one alphanumeric text field (should be searchable and if you are '
+    '#description' => t('Create one alphanumeric text field to store the contact\'s congressional '
+      . 'district (should be searchable. If you are '
       . 'using a version of CiviCRM where bug <a href="!CRM-586">CRM-5686</a> is fixed you '
-      . 'probably want to make the field view-only) to store the contact\'s congressional district.',
+      . 'probably want to make the field view-only).',
       array('!CRM-586' => 'http://issues.civicrm.org/jira/browse/CRM-5686')),
     '#required' => TRUE,
   );
@@ -265,8 +267,8 @@ function cd_sunlight_settings_fields_form() {
     '#title' => 'Congressional District Override Field',
     '#default_value' => check_plain($field_cd_sunlight_civicrm_cd_override),
     '#options' => $fields,
-    '#description' => t('Create a second alphanumeric text field (should be searchable) '
-      . 'to allow administrators to manually override the value queried from Sunlight. '),
+    '#description' => t('Create a second alphanumeric text field to allow administrators to '
+      . 'manually override the value queried from Sunlight (should be searchable). '),
     '#required' => TRUE,
   );
 
