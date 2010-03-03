@@ -29,6 +29,12 @@ function cd_sunlight_settings_form() {
     '#default_value' => variable_get('cd_sunlight_cron_contact_limit', 200),
     '#required' => TRUE,
   );
+  $form['cd_sunlight_debug'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Debugging'),
+    '#description' => t('Extra log entries will be made to aid in debugging.'),
+    '#default_value' => variable_get('cd_sunlight_debug', FALSE),
+  );
   if (function_exists('sys_getloadavg')) {
     $form['cd_sunlight_cron_load_limit'] = array(
       '#type' => 'textfield',
@@ -411,3 +417,137 @@ function cd_sunlight_batch_finished($success, $results, $operations) {
   drupal_set_message($message);
 }
 
+/**
+ * Menu Callback to display {cd_sunlight_cron}.
+ */
+function cd_sunlight_log() {
+  $rows = array();
+  $header = array(
+    array(
+      'data' => t('Time'),
+      'field' => 'insert_time',
+      'sort' => 'DESC',
+    ),
+    array(
+      'data' => t('Contact'),
+      'field' => 'contact_id',
+    ),
+    array(
+      'data' => t('Processed'),
+      'field' => 'processed',
+    ),
+    array(
+      'data' => t('URI'),
+      'field' => 'request_uri',
+    ),
+  );
+  if (variable_get('cd_sunlight_debug', FALSE)) {
+    $header[] = t('Backtrace');
+  }
+
+  // Build data.
+  $res = pager_query('SELECT * FROM {cd_sunlight_cron} '. tablesort_sql($header), 50);
+  while ($record = db_fetch_object($res)) {
+    $row = array(
+      format_date($record->insert_time),
+      l($record->contact_id, 'civicrm/contact/view', array('query' => 'reset=1&cid='. $record->contact_id)),
+      $record->processed,
+      check_plain($record->request_uri),
+    );
+    if (variable_get('cd_sunlight_debug', FALSE)) {
+      $row[] = '<pre>'. check_plain($record->backtrace) .'</pre>';
+    }
+    $rows[] = $row;
+  }
+  
+  // Create output;
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', array(), 50);
+  return $output;
+}
+
+/**
+ * Menu Callback to display summary analysis of {cd_sunlight_cron}.
+ */
+function cd_sunlight_log_summary() {
+  $output = '';
+
+  // Totals.
+  $first_record = format_date(db_result(db_query('SELECT MIN(insert_time) FROM {cd_sunlight_cron}')));
+  $last_record = format_date(db_result(db_query('SELECT MAX(insert_time) FROM {cd_sunlight_cron}')));
+  $output .= '<p>'. t('Log contains data from : %first_record to %last_record',
+      array('%first_record' => $first_record, '%last_record' => $last_record)) .'</p>';
+  $total_unprocessed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0'));
+  $total_processed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 1'));
+  $output .= '<p>'. t('Total records in the queue: %count',
+    array('%count' => number_format($total_processed + $total_unprocessed))) .'</p>';
+  $output .= '<p>'. t('Total records that have been processed: %count',
+    array('%count' => number_format($total_processed))) .'</p>';
+  $output .= '<p>'. t('Total records that have not been processed: %count',
+    array('%count' => number_format($total_unprocessed))) .'</p>';
+
+  // Most common contacts.
+  $header = array('Contact', 'Count');
+  $rows = array();
+  $result = db_query('SELECT contact_id, COUNT(*) AS cnt
+    FROM {cd_sunlight_cron}
+    GROUP BY contact_id
+    ORDER BY cnt DESC
+    LIMIT 10');
+  while ($record = db_fetch_object($result)) {
+    $row = array(
+      l($record->contact_id, 'civicrm/contact/view', array('query' => 'reset=1&cid='. $record->contact_id)),
+      $record->cnt,
+    );
+    $rows[] = $row;
+  }
+  $output .= theme('table', $header, $rows, array(), t('Most active contacts'));
+
+  // Most common URIs.
+  $header = array('URI', 'Count');
+  $rows = array();
+  $result = db_query('SELECT request_uri, COUNT(*) AS cnt
+    FROM {cd_sunlight_cron}
+    GROUP BY request_uri
+    ORDER BY cnt DESC
+    LIMIT 10');
+  while ($record = db_fetch_object($result)) {
+    $row = array(
+      $record->request_uri,
+      $record->cnt,
+    );
+    $rows[] = $row;
+  }
+  $output .= theme('table', $header, $rows, array(), t('Most common URIs'));
+
+  // Most active periods of time.
+  // 1NN seconds => left trim length of unix timestamp
+  $time_periods = array(
+    '00' => 8,
+    '000' => 7,
+    '0000' => 6,
+    '00000' => 5,
+  );
+  foreach ($time_periods as $seconds => $left_trim) {
+    $header = array('Period', 'Queued contacts');
+    $rows = array();
+    $result = db_query('SELECT LEFT(insert_time, %d) AS period, COUNT(*) AS cnt
+      FROM {cd_sunlight_cron}
+      GROUP BY period
+      ORDER BY cnt DESC
+      LIMIT 10', $left_trim);
+    while ($record = db_fetch_object($result)) {
+      $start = format_date($record->period . $seconds);
+      $end = format_date(($record->period + 1) . $seconds);
+      $row = array(
+        $start .' - '. $end,
+        $record->cnt,
+      );
+      $rows[] = $row;
+    }
+    $output .= theme('table', $header, $rows, array(),
+      t('Most active @seconds second period', array('@seconds' => number_format('1'. $seconds))));
+  }
+
+  return $output;
+}

@@ -54,7 +54,7 @@ define('CD_SUNLIGHT_CIVICRM_NON_US_STATE_PROVINCE_ID', 1099);
 function cd_sunlight_menu() {
   $items = array();
   $items['admin/settings/cd_sunlight'] = array(
-    'title' => 'CiviCRM Congressional District',
+    'title' => 'CiviCRM congressional district',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('cd_sunlight_settings_form'),
     'access arguments' => array('administer site configuration'),
@@ -85,6 +85,28 @@ function cd_sunlight_menu() {
     'access arguments' => array('administer site configuration'),
     'type' => MENU_LOCAL_TASK,
     'weight' => '3',
+    'file' => 'cd_sunlight.admin.inc',
+  );
+  $items['admin/reports/cd_sunlight'] = array(
+    'title' => 'CiviCRM congressional district lookup queue',
+    'page callback' => 'cd_sunlight_log',
+    'access arguments' => array('access site reports'),
+    'file' => 'cd_sunlight.admin.inc',
+  );
+  $items['admin/reports/cd_sunlight/log'] = array(
+    'title' => 'Log',
+    'page callback' => 'cd_sunlight_log',
+    'access arguments' => array('access site reports'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => '0',
+    'file' => 'cd_sunlight.admin.inc',
+  );
+  $items['admin/reports/cd_sunlight/summary'] = array(
+    'title' => 'Summary',
+    'page callback' => 'cd_sunlight_log_summary',
+    'access arguments' => array('access site reports'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => '2',
     'file' => 'cd_sunlight.admin.inc',
   );
   return $items;
@@ -128,6 +150,12 @@ function cd_sunlight_cron() {
     _cd_sunlight_zone_update_all();
     variable_set('cd_sunlight_last_process_new_regions', $time);
   }
+
+  // Cleanup old values from the cron table.
+  $max = db_result(
+    db_query('SELECT MAX(cd_sunlight_cron_id) FROM {cd_sunlight_cron} WHERE processed = 1'));
+  db_query('DELETE FROM {cd_sunlight_cron} WHERE cd_sunlight_cron_id <= %d AND processed = 1',
+    $max - variable_get('dblog_row_limit', 1000));
 
 }
 
@@ -298,7 +326,8 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
 
     // We queue new contacts here and not in hook_pre because they don't have a contact_id in
     // hook_pre.
-    // @todo We should only enqueue if the contact has address information.
+    // @todo We should only enqueue if the contact has address information.  This is what causes the
+    // 'This contact does not have enough address info to do a lookup' log entry. 
     cd_sunlight_contact_enqueue($contact_id);
   }
   elseif ($op == 'edit') {
@@ -312,6 +341,10 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
       _cd_sunlight_geocode_set('disabled');
 
       // Get the CD.
+      if (variable_get('cd_sunlight_debug', FALSE)) {
+        watchdog('cd_sunlight', 'Doing an immediate lookup for contact @contact_id',
+          array('@contact_id' => $contact_id), WATCHDOG_DEBUG);
+      }
       $cd = _cd_sunlight_contact_cd_update($contact_id);
       if ($cd === FALSE) {
         drupal_set_message(
@@ -333,7 +366,29 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
  * @return none.
  */
 function cd_sunlight_contact_enqueue($contact_id) {
-  db_query('INSERT IGNORE INTO {cd_sunlight_cron} SET contact_id = %d', $contact_id);
+  
+  // If the contact is already queued, bail.
+  $already_queued = db_result(
+    db_query('SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d AND processed = 0', $contact_id));
+  if ($already_queued) {
+    if (variable_get('cd_sunlight_debug', FALSE)) {
+      watchdog('cd_sunlight', 'Contact @contact_id re-queued before being processed.',
+        array('@contact_id' => $contact_id), WATCHDOG_DEBUG);
+    }
+    return;
+  }
+
+  // Queue the contact.
+  $uri = request_uri();
+  if (variable_get('cd_sunlight_debug', FALSE)) {
+    $backtrace = _cd_sunlight_backtrace();
+  }
+  else {
+    $backtrace = '';
+  }
+  db_query('INSERT IGNORE INTO {cd_sunlight_cron}
+    SET contact_id = %d, request_uri = "%s", backtrace = "%s", insert_time = %d, processed = 0',
+    $contact_id, $uri, $backtrace, $_SERVER['REQUEST_TIME']);
 }
 
 /**
@@ -344,7 +399,8 @@ function cd_sunlight_contact_enqueue($contact_id) {
  * @return none.
  */
 function cd_sunlight_contact_dequeue($contact_id) {
-  db_query('DELETE FROM {cd_sunlight_cron} WHERE contact_id = %d', $contact_id);
+  db_query('UPDATE {cd_sunlight_cron} SET processed = 1 WHERE contact_id = %d and processed = 0',
+    $contact_id);
 }
 
 /**
@@ -540,7 +596,7 @@ function cd_sunlight_cd_all() {
   );
   db_set_active();
   while ($cd = db_fetch_object($res)) {
-    if (!empty($cd->cd)) {
+    if (!empty($cd->cd) && _cd_sunlight_validate_cd($cd->cd)) {
       $cds[] = $cd->cd;
     }
   }
@@ -1314,7 +1370,7 @@ function _cd_sunlight_contact_apilookup($contact) {
       )
     ) {
       if (empty($postal_code)) {
-        return NULL;
+        return array();
       }
       watchdog('cd_sunlight',
         'Point not within a congressional district, trying again with only zip: @params',
@@ -1572,7 +1628,8 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
   }
   elseif (!empty($response->error) || $response->code != 200) {
     // The connection was unsuccessful for whatever reason.
-    watchdog('cd_sunlight', 'Connection to Sunlight was unsuccessful.  Your key may be disabled.: @code : @data',
+    watchdog('cd_sunlight', 'Connection to Sunlight was unsuccessful.  The connection may have '.
+      'timed out or your key may be disabled.: @code : @data',
       array('@data' => $response->error, '@code' => $response->code), WATCHDOG_ERROR);
     $error_message = t('Connection to Sunlight was unsuccessful: @code', array('@code' => $response->code));
     return FALSE;
@@ -1698,11 +1755,11 @@ function _cd_sunlight_process_queue() {
       'FROM civicrm_address a '.
       'LEFT JOIN '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
         'ON c.entity_id = a.contact_id '.
-          'AND a.is_primary = 1 '.
       'WHERE ( '.
           'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
           'OR c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
         ') '.
+        'AND a.is_primary = 1 '.
         'AND a.geo_code_1 IS NOT NULL '.
         'AND a.geo_code_1 <> 0 '.
         'AND a.country_id = '. CD_SUNLIGHT_CIVICRM_US_COUNTRY_ID .' '.
@@ -1722,9 +1779,13 @@ function _cd_sunlight_process_queue() {
         'AND a.contact_id <> 0'
     );
     db_set_active();
+    $count = 0;
     while ($contact = db_fetch_object($res)) {
       cd_sunlight_contact_enqueue($contact->contact_id);
+      $count ++;
     }
+    watchdog('cd_sunlight', 'Enqueued @count contacts with new geocodes', array('@count' => $count),
+      WATCHDOG_INFO);
   }
 
   watchdog('cd_sunlight', 'Processing queued CD lookups', array(), WATCHDOG_INFO);
@@ -1732,7 +1793,7 @@ function _cd_sunlight_process_queue() {
   // Update our CDs.
   civicrm_initialize();
   require_once('api/v2/Contact.php');
-  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron}', 0,
+  $results = db_query_range('SELECT contact_id FROM {cd_sunlight_cron} WHERE processed = 0', 0,
     variable_get('cd_sunlight_cron_contact_limit', 200));
   $x = 0;
   while ($queue = db_fetch_object($results)) {

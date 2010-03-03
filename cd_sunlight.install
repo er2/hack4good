@@ -13,6 +13,12 @@ function cd_sunlight_schema() {
   $schema['cd_sunlight_cron'] = array(
     'description' => t('Contains contact_ids that will be sent for CD Lookup on the next cron run.'),
     'fields' => array(
+      'cd_sunlight_cron_id' => array(
+        'description' => t('Autoincrementing primary key.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
       'contact_id' => array(
         'description' => t('CiviCRM Contact ID.'),
         'type' => 'int',
@@ -20,8 +26,36 @@ function cd_sunlight_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+     'request_uri' => array(
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => FALSE,
+      ),
+     'backtrace' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'Optional backtrace. Only stored when debugging mode is enabled.',
+      ),
+     'insert_time' => array(
+        'description' => t('When this row was inserted.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'processed' => array(
+        'description' => t('0 when the contact is first queued, set to 1 when dequeued.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
     ),
-    'primary key' => array('contact_id'),
+    'primary key' => array('cd_sunlight_cron_id'),
+    'indexes' => array(
+      'cd_sunlight_cron_contact_id_processed_idx' => array('contact_id', 'processed'),
+    ),
   );
 
   $schema['cd_sunlight_legislators'] = array(
@@ -181,7 +215,7 @@ function cd_sunlight_schema() {
         'not null' => FALSE,
       ),
       'youtube_url' => array(
-        'description' => t('http://youtube.com'),
+        'description' => t('http://youtube.com/'),
         'type' => 'varchar',
         'length' => '64',
         'not null' => FALSE,
@@ -242,7 +276,7 @@ function cd_sunlight_requirements($phase) {
     );
 
     // Report the number of records in the lookup queue.
-    $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron}'));
+    $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0'));
     $requirements['cd_sunlight_count'] = array(
       'title' => 'CiviCRM Sunlight Congressional District queue',
       'value' => t('There are !count contacts in the queue for a CD lookup.',
@@ -318,5 +352,79 @@ function cd_sunlight_uninstall() {
  */
 function cd_sunlight_update_4() {
   $ret = array();
+  return $ret;
+}
+
+/**
+ * Change our cron table to the new and improved version with more detailed logging.
+ */
+function cd_sunlight_update_6001() {
+  $ret = array();
+
+  // First get all the existing contact_ids.
+  $res = db_query('SELECT contact_id FROM {cd_sunlight_cron}');
+  $contact_ids = array();
+  while ($row = db_fetch_object($res)) {
+    $contact_ids[] = $row->contact_id;
+  }
+
+  // Drop the old table.
+  $ret[] = update_sql('DROP TABLE {cd_sunlight_cron}');
+
+  // Recreate the table.
+  $table = array(
+    'description' => t('Contains contact_ids that will be sent for CD Lookup on the next cron run.'),
+    'fields' => array(
+      'cd_sunlight_cron_id' => array(
+        'description' => t('Autoincrementing primary key.'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'contact_id' => array(
+        'description' => t('CiviCRM Contact ID.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+     'request_uri' => array(
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => FALSE,
+      ),
+     'backtrace' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'description' => 'Optional backtrace. Only stored when debugging mode is enabled.',
+      ),
+     'insert_time' => array(
+        'description' => t('When this row was inserted.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'processed' => array(
+        'description' => t('0 when the contact is first queued, set to 1 when dequeued.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('cd_sunlight_cron_id'),
+    'indexes' => array(
+      'cd_sunlight_cron_contact_id_processed_idx' => array('contact_id', 'processed'),
+    ),
+  );
+  db_create_table($ret, 'cd_sunlight_cron', $table);
+
+  // Requeue the contact_ids from the old table.
+  foreach ($contact_ids as $contact_id) {
+    cd_sunlight_contact_enqueue($contact_id);
+  }
+
   return $ret;
 }

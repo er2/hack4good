@@ -230,12 +230,18 @@ function _congress_block_view($delta) {
     }
   }
   $display_fields = variable_get('congress_block_' . $delta . '_display_fields', array());
+  if (!is_array($legislators)) {
+    $trace = _cd_sunlight_backtrace();
+    watchdog('congress', 'Legislators not found.  <pre>@trace</pre>', array('@trace' => $trace),
+      WATCHDOG_WARNING);
+    return;
+  }
   foreach ($legislators as $legislator) {
     $output .= theme('congress_legislator', $legislator, $display_fields);
   }
   if ($output) {
     if (variable_get('congress_block_' . $delta . '_more_link', FALSE) && user_access('view congress members')) {
-      $output .= '<p>'. l('View more districts', 'congress/all') .'</p>';
+      $output .= '<div class="more-link">'. l('View more districts', 'congress/all') .'</div>';
     }
     $block = array(
       'subject' => '',

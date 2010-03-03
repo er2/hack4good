@@ -277,7 +277,8 @@ class cdSunlightWebTestCase extends DrupalWebTestCase {
    * @param int $contact_id
    */
   private function _checkQueue($contact_id) {
-    return db_result(db_query('SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d', $contact_id));
+    return db_result(db_query(
+      'SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d AND processed = 0', $contact_id));
   }
 
   /**
