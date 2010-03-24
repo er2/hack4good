@@ -220,8 +220,9 @@ function _congress_block_view($delta) {
     }
     else {
       $cd = cd_sunlight_user_get_cd($user->uid);
-      if (empty($cd)) {
+      if (empty($cd) || $cd == 'not found') {
         $output = filter_xss_admin(variable_get('congress_block_no_cd_message', ''));
+        $legislators = array();
       }
       else {
         $district = cd_sunlight_cd_load($cd);
@@ -230,12 +231,6 @@ function _congress_block_view($delta) {
     }
   }
   $display_fields = variable_get('congress_block_' . $delta . '_display_fields', array());
-  if (!is_array($legislators)) {
-    $trace = _cd_sunlight_backtrace();
-    watchdog('congress', 'Legislators not found.  <pre>@trace</pre>', array('@trace' => $trace),
-      WATCHDOG_WARNING);
-    return;
-  }
   foreach ($legislators as $legislator) {
     $output .= theme('congress_legislator', $legislator, $display_fields);
   }
@@ -309,55 +304,29 @@ function congress_districts($cd = NULL) {
     return congress_district_view($user, $cd);
   }
 
-  $pager_element = 0;
-  $page = isset($_GET['page']) ? $_GET['page'] : '';
-  $cache_key = 'congress_all_districts:'. $page;
-
-  $cache = cache_get($cache_key);
-  if (empty($cache->data) || ($cache->expire < $_SERVER['REQUEST_TIME'])) {
-
-    // Build the list of districts.
-    // TODO: Would be nice if this could be an API function in cd_sunlight.  But then we'd need
-    // to do a pager with no-SQL data.  Which I'm pretty sure is doable.
-    db_set_active('civicrm');
-    $sql = 'SELECT * FROM ('.
-        'SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS cd, COUNT(*) as users '.
-        'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
-        'INNER JOIN civicrm_uf_match u '.
-          'ON c.entity_id = u.contact_id '.
-        'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .
-      ') AS cds '.
-      'ORDER BY SUBSTR(cd, 1, 2), CAST(SUBSTR(cd, 3) AS UNSIGNED)';
-    $sql_count = 'SELECT COUNT(*) FROM ('.
-        'SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
-        'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
-        'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
-      ') districts';
-    $res = pager_query($sql, 50, $pager_element, $sql_count);
-    db_set_active();
-
-    // Build the table.
-    $header = array('State', 'District', 'Users');
-    $rows = array();
-    while ($cd = db_fetch_array($res)) {
-      if (empty($cd['cd'])) {
-        continue;
-      }
-      $state = cd_sunlight_cd_parse_state($cd['cd']);
-      $district = cd_sunlight_cd_parse_district($cd['cd']);
-      $rows[] = array(
-        $state,
-        l($district, 'congress/'. $cd['cd']),
-        $cd['users']
-      );
+  // Build the list of districts.
+  $res = db_query('SELECT state, district '.
+    'FROM {cd_sunlight_legislators} '.
+    'GROUP BY state, district '.
+    'ORDER BY state, district');
+  $states = array();
+  while ($row = db_fetch_object($res)) {
+    $cd = $row->state . $row->district;
+    // This filters out things like NY0.
+    if (_cd_sunlight_validate_cd($cd)) {
+      $states[$row->state][$row->district] = l($cd, 'congress/'. $cd);
     }
-    $output = theme('table', $header, $rows);
-    $output .= theme('pager', NULL, 50, $pager_element);
-    cache_set($cache_key, $output, 'cache', $_SERVER['REQUEST_TIME'] + 60 * 60 * 24);
   }
-  else {
-    $output = $cache->data;
+
+  // Build the table.
+  $header = array('State', 'Districts');
+  $rows = array();
+
+  foreach ($states as $state => $districts) {
+    $cd_string = implode(', ', $districts);
+    $rows[] = array(cd_sunlight_state_abbr2name($state), $cd_string);
   }
+  $output = theme('table', $header, $rows);
   return $output;
 }
 
@@ -410,7 +379,8 @@ function theme_congress_district($district, $contact = NULL) {
     }
   }
   else {
-    $title .= $district['cd'];
+    $state = cd_sunlight_cd_parse_state($district['cd']);
+    $title .= cd_sunlight_state_abbr2name($state) .' '. $district['cd'];
   }
   drupal_set_title($title);
 
@@ -551,8 +521,8 @@ function theme_congress_legislator($legislator, $display_params = array()) {
     $output .= '<p>'. l('YouTube', $legislator['youtube_url']
       , array('target' => '_blank')) .'</p>';
   }
-  if (isset($display_params['twitter']) && !empty($legislator['twitter'])) {
-    $output .= '<p>'. l('Twitter', 'http://twitter.com/'. $legislator['twitter']
+  if (isset($display_params['twitter']) && !empty($legislator['twitter_id'])) {
+    $output .= '<p>'. l('Twitter', 'http://twitter.com/'. $legislator['twitter_id']
       , array('target' => '_blank')) .'</p>';
   }
   $output .= '</div>';

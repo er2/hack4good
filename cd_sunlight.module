@@ -14,6 +14,7 @@
  *    single digit districts shall have no leading zeros.
  *  zone - A region: either 'state' or 'cd'.
  *
+ * @todo _cd_sunlight_validate* functions should be split into validate and clean functions. 
  */
 
 /**
@@ -122,8 +123,8 @@ function cd_sunlight_cron() {
     list($load) = sys_getloadavg();
     $limit = variable_get('cd_sunlight_cron_load_limit', 2);
     if (is_numeric($load) && !empty($limit) && $load > $limit) {
-      watchdog('cd_sunlight', 'System load is higher than '. $limit .
-        ', cd_sunlight_cron will not be run.', array(), WATCHDOG_WARNING);
+      watchdog('cd_sunlight', 'System load is higher than @limit, cd_sunlight_cron will not be run.',
+        array('@limit' => $limit), WATCHDOG_WARNING);
       return;
     }
   }
@@ -147,7 +148,7 @@ function cd_sunlight_cron() {
   $day_ago = ($time - 60 * 60 * 24);
   $has_been_populated = _cd_sunlight_legislators_exist();
   if (!$has_been_populated || $last_run < $day_ago) {
-    _cd_sunlight_zone_update_all();
+    _cd_sunlight_congress_update_all();
     variable_set('cd_sunlight_last_process_new_regions', $time);
   }
 
@@ -219,19 +220,11 @@ function cd_sunlight_civicrm_pre($op, $object_type, $contact_id, &$ref) {
       }
     }
     else {
-      // Address is not here.
-      $backtrace = _cd_sunlight_backtrace();
-      // What may have happened is that the CiviCRM API was called with no address data.
-      if (strpos($backtrace[5], 'api/v2/Contact.php') !== FALSE) {
-        return TRUE;
-      }
-      watchdog('cd_sunlight', 'Error durring hook_civicrm_pre() This version of CiviCRM might not '.
-        'be supported. @backtrace @ref',
-        array('@backtrace' => $backtrace, '@ref' => var_export($_ref, TRUE)),
-        WATCHDOG_ERROR,
-        l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
+      // Address is not here.  This contact either has no address,
+      // or only non-address data was edited.
       return TRUE;
     }
+    
     if (isset($address['postal_code'])) {
       $ref_postal_code = $address['postal_code'];
     }
@@ -467,7 +460,7 @@ function cd_sunlight_contact_get_district($contact_id) {
  *
  * @param int $uid
  * @return string
- *  ex. 'NY17' or NULL if not set/error.
+ *  ex. 'NY17' or 'not found' or NULL if not yet set/error.
  */
 function cd_sunlight_user_get_cd($uid) {
   if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
@@ -576,28 +569,51 @@ function cd_sunlight_cd_load($cd, $return_properties = array('legislators')) {
 }
 
 /**
- * Get a list of all CDs stored in the database.
+ * Get a list of all CDs in use by CiviCRM contacts.
  *
  * Includes CDs in CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD
- * and CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE
+ * and CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE.
  *
  * @return array
  *  Simple array of CDs.
  */
-function cd_sunlight_cd_all() {
+function cd_sunlight_cd_get_all_used() {
   $cds = array();
   db_set_active('civicrm');
   $res = db_query('SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS cd '.
     'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
-    'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .
-    ' UNION SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS cd '.
+    'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
+    'UNION SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS cd '.
     'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
     'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE
   );
   db_set_active();
   while ($cd = db_fetch_object($res)) {
     if (!empty($cd->cd) && _cd_sunlight_validate_cd($cd->cd)) {
-      $cds[] = $cd->cd;
+      $cds[$cd->cd] = $cd->cd;
+    }
+  }
+  return $cds;
+}
+
+/**
+ * Get a list of all CDs.
+ *
+ * Cron has to have succesfully populated {cd_sunlight_legislators} for this to work. 
+ *
+ * @return array
+ *  Simple array of CDs.
+ */
+function cd_sunlight_cd_get_all() {
+  $cds = array();
+  $res = db_query('SELECT CONCAT(state, district) AS cd '.
+    'FROM {cd_sunlight_legislators} '.
+    'GROUP BY state, cd '.
+    'ORDER BY state, district'
+  );
+  while ($cd = db_fetch_object($res)) {
+    if (!empty($cd->cd) && _cd_sunlight_validate_cd($cd->cd)) {
+      $cds[$cd->cd] = $cd->cd;
     }
   }
   return $cds;
@@ -676,7 +692,7 @@ function cd_sunlight_legislators_get($params = array(), $order_by = array('state
  *  ex. 'NY'
  */
 function cd_sunlight_cd_parse_state($cd) {
-  if ($cd == 'not_found') {
+  if ($cd == 'not found') {
     return '';
   }
   return drupal_substr($cd, 0, 2);
@@ -691,11 +707,45 @@ function cd_sunlight_cd_parse_state($cd) {
  *  ex. 17
  */
 function cd_sunlight_cd_parse_district($cd) {
-  if ($cd == 'not_found') {
+  if ($cd == 'not found') {
     return '';
   }
   // Note that we can't use substr($cd, -2) because the district might only be one digit.
   return drupal_substr($cd, 2);
+}
+
+/**
+ * Convert long state name to 2 letter abbreviation.
+ *
+ * @param string $state_name
+ *  the state name
+ * @return mixed
+ *  the abbreviation, or null if not-exists.
+ */
+function cd_sunlight_state_name2abbr($state_name) {
+  civicrm_initialize();
+  require_once('CRM/Core/PseudoConstant.php');
+  $states = CRM_Core_PseudoConstant::stateProvince();
+  $abbreviations = CRM_Core_PseudoConstant::stateProvinceAbbreviation();
+  $id = array_search($state_name, $states);
+  return $abbreviations[$id];
+}
+
+/**
+ * Convert state abbreviation long name.
+ *
+ * @param string $state_abbr
+ *  the state name
+ * @return mixed
+ *  the abbreviation, or null if not-exists.
+ */
+function cd_sunlight_state_abbr2name($state_abbr) {
+  civicrm_initialize();
+  require_once('CRM/Core/PseudoConstant.php');
+  $states = CRM_Core_PseudoConstant::stateProvince();
+  $abbreviations = CRM_Core_PseudoConstant::stateProvinceAbbreviation();
+  $id = array_search($state_abbr, $abbreviations);
+  return $states[$id];
 }
 
 /**
@@ -878,7 +928,7 @@ function cd_sunlight_contacts_geocode() {
 
   // Log results.
   if ($response->code == 200 && strpos($response->data, 'Addresses Geocoded :') !== FALSE) {
-    watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_NOTICE);
+    watchdog('cd_sunlight', '@data', array('@data' => $response->data), WATCHDOG_INFO);
   }
   elseif (empty($response->code)) {
     watchdog('cd_sunlight', 'Error during contact geocoding.  There was likely a timeout.  You '.
@@ -925,7 +975,7 @@ function _cd_sunlight_validate_cd(&$cd) {
   if ($cd === NULL) {
     return TRUE;
   }
-  // Other blanks are valid, but change to ZLS for consistency.
+  // Other empties are valid, but change to ZLS for consistency.
   if (empty($cd)) {
     $cd = '';
     return TRUE;
@@ -1101,7 +1151,7 @@ function _cd_sunlight_legislator_save($legislator) {
     return FALSE;
   }
 
-  drupal_write_record('cd_sunlight_legislators', $legislator);
+  return (bool)drupal_write_record('cd_sunlight_legislators', $legislator);
 
 }
 
@@ -1139,8 +1189,8 @@ function _cd_sunlight_user_get_contact_id($uid) {
   civicrm_initialize();
   require_once('api/UFGroup.php');
   if (!($contact_id = crm_uf_get_match_id($uid))) {
-    watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a contact_id for uid '. $uid ,
-      array(), WATCHDOG_WARNING
+    watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a contact_id for uid @uid <pre>@trace</trace>',
+      array('@uid' => $uid, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_WARNING
     );
     return NULL;
   }
@@ -1148,114 +1198,57 @@ function _cd_sunlight_user_get_contact_id($uid) {
 }
 
 /**
- * Update all info about a CD or State by retreiving it from the Sunlight API.
+ * Update all members of congress that match a set of search parameters.
  *
- * Currently this is only legislators.  But the API could be used to retreive all zip codes in
- * a CD as well.
+ * Note that we only care about legislators currently in office, not dead/defeated/retired ones.
  *
- * Note that we only care about legislators in office, not dead/defeated/retired ones.
- *
- * @param $zone
- *  either 'state' or 'cd'
- * @param $name
- *  ex. 'NY' or 'NY17'.
+ * @param $params
+ *  Search parameters.
+ *  @see _cd_sunlight_legislators_apilookup()
  * @return boolean
  *  TRUE on success, else FALSE.
  */
-function _cd_sunlight_zone_update($zone, $name) {
-
-  // Sanity checking.
-  if ($zone == 'cd') {
-    if (!_cd_sunlight_validate_cd($name)) {
-      watchdog(
-        'cd_sunlight',
-        'Improper parameters for _cd_sunlight_zone_update(): %name is not a CD.',
-        array('%name' => $name),
-        WATCHDOG_ERROR
-      );
-      return FALSE;
-    }
-    $state = cd_sunlight_cd_parse_state($name);
-    $district = cd_sunlight_cd_parse_district($name);
-  }
-  elseif ($zone == 'state') {
-    if (!_cd_sunlight_validate_state($name)) {
-      watchdog(
-        'cd_sunlight',
-        'Improper parameters for _cd_sunlight_zone_update(): %name is not a state.',
-        array('%name' => $name),
-        WATCHDOG_ERROR
-      );
-      return FALSE;
-    }
-    $state = $name;
-  }
-  else {
-    watchdog(
-      'cd_sunlight',
-      'Improper parameters for _cd_sunlight_zone_update(). ',
-      array(),
-      WATCHDOG_ERROR
-    );
-    return FALSE;
-  }
-
-  // Abort on special states.
-  if (in_array($state, _cd_sunlight_state_list_with_no_congresspersons())) {
-    return TRUE;
-  }
-
-  // Lookup the legislators for this zone.
-  if ($zone == 'cd') {
-    $params = array(
-      'title' => 'Rep',
-      'state' => $state,
-    );
-    // Some may have $district == 0 (states with just one district).
-    if ($district) {
-      $params['district'] = $district;
-    }
-  }
-  else {
-    $params = array(
-      'title' => 'Sen',
-      'state' => $state,
-    );
-  }
-  if (in_array($state, _cd_sunlight_state_list_with_non_voting_congresspersons())) {
-    unset($params['title'], $params['district']);
-  }
+function _cd_sunlight_congress_update_params($params) {
+  $query = drupal_query_string_encode($params);
   $legislators = _cd_sunlight_legislators_apilookup($params);
   if ($legislators === FALSE) {
-    watchdog('cd_sunlight', 'Could not lookup legislators for %zone - %name',
-      array('%zone' => $zone, '%name' => $name),
-      WATCHDOG_ERROR
-    );
+    watchdog('cd_sunlight', 'Could not lookup legislators for %query',
+      array('%query' => $query), WATCHDOG_ERROR);
     return FALSE;
   }
-  if (!count($legislators)) {
-    watchdog('cd_sunlight', 'There are currently no legislators for %zone - %name',
-      array('%zone' => $zone, '%name' => $name));
+  if (empty($legislators)) {
+    watchdog('cd_sunlight', 'There are currently no legislators for %query',
+      array('%query' => $query), WATCHDOG_NOTICE);
   }
 
   // Because we only care about current legislators, delete any previous matching records.
   _cd_sunlight_legislator_delete($params);
 
+  if (empty($legislators)) {
+    return FALSE;
+  }
+
   // Save our new legislators.
   $error = FALSE;
   foreach ($legislators as $legislator) {
-    if (_cd_sunlight_legislator_save($legislator)) {
+    if (!_cd_sunlight_legislator_save($legislator)) {
       $error = TRUE;
     }
   }
 
   // Return something.
   if ($error) {
-    watchdog('cd_sunlight', 'Could not save new legislator data to %zone - %name',
-      array('%zone' => $zone, '%name' => $name),
-      WATCHDOG_ERROR
-    );
+    watchdog('cd_sunlight', 'Could not save new legislator data for %query',
+      array('%query' => $query), WATCHDOG_ERROR);
     return FALSE;
+  }
+  else {
+    watchdog('cd_sunlight', "Updated data for @count @param.",
+      array(
+        '@count' => count($legislators),
+        '@param' => (isset($params['title']) ? $params['title'] .'s' : t('non-voting state'))
+      ), WATCHDOG_INFO);
+
   }
   return TRUE;
 }
@@ -1498,7 +1491,7 @@ function _cd_sunlight_contact_cd_update($contact_id) {
     cd_sunlight_contact_dequeue($contact_id);
     return $cd;
   }
-  watchdog('cd_sunlight', 'Error saving contact: @contact @cd_data'.
+  watchdog('cd_sunlight', 'Error saving contact: @contact @cd_data',
     array('@contact' => var_export($contact, TRUE), '@cd_data' => var_export($cd_data, TRUE)),
     WATCHDOG_ERROR,
     l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
@@ -1573,7 +1566,7 @@ function _cd_sunlight_contact_set_cd($contact_id, $cd = NULL, $override = NULL) 
   _cd_sunlight_contact_set_cd_is_running(TRUE);
   if (civicrm_error($contact = civicrm_contact_add($contact))) {
     $backtrace = _cd_sunlight_backtrace();
-    watchdog('cd_sunlight', __LINE__ . ': CiviCRM API error: @backtrace @contact',
+    watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
       array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id))
     );
@@ -1660,39 +1653,40 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
 /**
  * Update the info for all legislators.
  *
- * Cron calls this, perhaps nightly.  This should take 30-120 seconds to complete.
+ * Cron calls this, perhaps nightly.  This should take 5-30 seconds to complete.
  *
  * @return none
  */
-function _cd_sunlight_zone_update_all() {
-
+function _cd_sunlight_congress_update_all() {
   watchdog('cd_sunlight', 'Updating all members of congress', array(), WATCHDOG_INFO);
 
-  // Get a list of all states and fetch the senators for those states.
-  require_once('CRM/Core/PseudoConstant.php');
-  $district_count = 0;
-  $state_count = 0;
-  $states = CRM_Core_PseudoConstant::stateProvinceAbbreviation();
+  // Update all Senators.
+  $params = array(
+    'title' => 'Sen',
+  );
+  _cd_sunlight_congress_update_params($params);
+
+  // Give things a chance to catch up, don't clobber Sunlight.
+  _cd_sunlight_sleep();
+
+  // Update all Representatives.
+  $params = array(
+    'title' => 'Rep',
+  );
+  _cd_sunlight_congress_update_params($params);
+
+  // Give things a chance to catch up, don't clobber Sunlight.
+  _cd_sunlight_sleep();
+
+  // Update all Non-voting states.
+  $states = _cd_sunlight_state_list_with_non_voting_congresspersons();
   foreach ($states as $state) {
-    if (_cd_sunlight_zone_update('state', $state)) {
-      $state_count ++;
-    }
-
-    // Give things a chance to catch up, don't clobber Sunlight.
+    $params = array(
+      'state' => $state,
+    );
+    _cd_sunlight_congress_update_params($params);
     _cd_sunlight_sleep();
   }
-
-  // Get a list of all CDs and fetch the representatives for those CDs.
-  $cds = cd_sunlight_cd_all();
-  foreach ($cds as $cd) {
-    if (_cd_sunlight_zone_update('cd', $cd)) {
-      $district_count++;
-    }
-
-    // Give things a chance to catch up, don't clobber Sunlight.
-    _cd_sunlight_sleep();
-  }
-  watchdog('cd_sunlight', "Updated data for $state_count states and $district_count CDs.");
 
 }
 
@@ -1705,7 +1699,7 @@ function _cd_sunlight_zone_update_all() {
 function _cd_sunlight_state_list_at_large() {
   static $states = array(
     'AK', 'DE', 'MT', 'ND', 'SD', 'VT', 'WY',
-    'AA', 'AE', 'AP', 'MP', 'UM', 'XX', // _cd_sunlight_state_list_with_no_congresspersons()
+    'AA', 'AE', 'AP', 'UM', 'XX',       // _cd_sunlight_state_list_with_no_congresspersons()
     'AS', 'DC', 'GU', 'MP', 'VI', 'PR', // _cd_sunlight_state_list_with_non_voting_congresspersons()
   );
   return $states;
@@ -1719,7 +1713,7 @@ function _cd_sunlight_state_list_at_large() {
  */
 function _cd_sunlight_state_list_with_no_congresspersons() {
   // 'XX' is our special "non-us citizen" state.
-  static $states = array('AA', 'AE', 'AP', 'MP', 'UM', 'XX', );
+  static $states = array('AA', 'AE', 'AP', 'UM', 'XX', );
   return $states;
 }
 
@@ -1773,14 +1767,15 @@ function _cd_sunlight_process_queue() {
             'a.street_address IS NOT NULL AND '.
             'a.street_address <> "" '.
           ') '.
-        ') '.
-        // Some buggy versions of CiviCRM have addresses with no contact_id.
-        'AND a.contact_id IS NOT NULL '.
-        'AND a.contact_id <> 0'
+        ') '
     );
     db_set_active();
     $count = 0;
     while ($contact = db_fetch_object($res)) {
+        // Some buggy versions of CiviCRM have addresses with no contact_id.
+        if (empty($contact->cid)) {
+          continue;
+        }
       cd_sunlight_contact_enqueue($contact->contact_id);
       $count ++;
     }
@@ -1806,7 +1801,7 @@ function _cd_sunlight_process_queue() {
     $x++;
   }
   if ($x > 0) {
-    watchdog('cd_sunlight', 'Cron has processed '. $x .' records.', NULL, WATCHDOG_INFO);
+    watchdog('cd_sunlight', 'Cron has processed @count records.', array('@count' => $x), WATCHDOG_INFO);
   }
 }
 
@@ -1953,7 +1948,7 @@ function _cd_sunlight_connection_test() {
  * Used when performing bulk actions against sunlight to avoid clobbering the server.
  */
 function _cd_sunlight_sleep() {
-  usleep(50000); // 50,000 ?s == 0.05 seconds
+  usleep(100000); // 100,000 microseconds == 0.1 seconds
 }
 
 /**
@@ -2091,6 +2086,9 @@ function _cd_sunlight_civicrm_contact_get($search_params) {
 
 /**
  * Get some backtrace info as a string suitable for watchdogging.
+ *
+ * @return string
+ *  Wrap in <pre></pre> and send through check_plain.
  */
 function _cd_sunlight_backtrace() {
   $backtrace = debug_backtrace();
@@ -2121,29 +2119,29 @@ function _cd_sunlight_backtrace() {
  *
  * Use this if you are running into "MySQL has gone away" errors.  These can happen especially
  * during cron and anything else that takes more than 90 seconds.
+ *
+ * @param int $timeout = 900
+ *  The timeout to set in seconds.
  */
-function _cd_sunlight_mysql_wait_timeout() {
-  global $db_type;
-  $ping_function = $db_type .'_ping';
+function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
+  global $db_url;
 
-//  watchdog('cd_sunlight', 'Increasing MySQL wait timeout.', array(), WATCHDOG_INFO);
+  // Set in Drupal.
+  $old_db = db_set_active();
 
-  $old_db = db_set_active('civicrm');
-  $ping_function($GLOBALS['active_db']);
-  db_query('SET SESSION wait_timeout = 900');
-  db_query('SET SESSION interactive_timeout = 900');
-  db_set_active();
-  $ping_function($GLOBALS['active_db']);
-  db_query('SET SESSION wait_timeout = 900');
-  db_query('SET SESSION interactive_timeout = 900');
+  foreach ($db_url as $db_name => $connection_string) {
+    db_set_active($db_name);
+    db_query('SET SESSION wait_timeout = %d', $timeout);
+  }
 
-  civicrm_initialize();
-  require_once('CRM/Core/DAO.php');
-  CRM_Core_DAO::executeQuery('SET SESSION wait_timeout = 900', CRM_Core_DAO::$_nullArray);
-  CRM_Core_DAO::executeQuery('SET SESSION interactive_timeout = 900', CRM_Core_DAO::$_nullArray);
-
-  if ($old_db && $old_db != 'default') {
+  if ($old_db && $old_db != $db_name) {
     db_set_active($old_db);
   }
+
+  // Set in CiviCRM.
+  civicrm_initialize();
+  require_once('CRM/Core/DAO.php');
+  $params = array( 1 => array( $timeout, 'Integer' ) );
+  CRM_Core_DAO::executeQuery('SET SESSION wait_timeout = %1', $params);
 
 }

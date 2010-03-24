@@ -47,12 +47,14 @@ cd_sunlight_user_get_cd($uid)
 cd_sunlight_user_get_state($uid)
 cd_sunlight_user_get_district($uid)
 cd_sunlight_cd_load($cd, $return_properties = array('legislators')) 
-cd_sunlight_cd_all() 
+cd_sunlight_cd_get_all()
+cd_sunlight_cd_get_all_used()
 cd_sunlight_legislators_get($params = array(), $order_by = array('state' => 'ASC', 'district' => 'ASC', 'lastname' => 'ASC'))
 cd_sunlight_validate_civicrm_data($contact)
 cd_sunlight_cd_parse_state($cd)
 cd_sunlight_cd_parse_district($cd)
-
+cd_sunlight_state_abbr2name($state_abbr);
+cd_sunlight_state_name2abbr($state_name);
 
 * CONGRESS MODULE *
 
