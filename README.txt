@@ -9,7 +9,7 @@ This module provides a way to automatically get congressional district informati
 contacts into CiviCRM using the Sunlight API.
 http://wiki.sunlightlabs.com/Sunlight_API_Documentation
 It also fetches data about the current members of congress.  You can access all this data via an
-API.
+API or use the Views module.
 
 
 * INSTALL *
@@ -34,6 +34,13 @@ API.
   District will be retrieved the next time cron is run.
 
 
+* VIEWS INTEGRATION *
+
+Once you've installed the Views module, you can find the default view at 
+/admin/build/views
+called "Congress".  You can either customize it or create a new view of the type "Congress".
+
+
 * USING THE API *
 
 Here are the functions.  See the docbook comments for more info.
@@ -56,10 +63,12 @@ cd_sunlight_cd_parse_district($cd)
 cd_sunlight_state_abbr2name($state_abbr);
 cd_sunlight_state_name2abbr($state_name);
 
+
 * CONGRESS MODULE *
 
 The congress module is an example implementation of the API.  It provides a few blocks and a user
-tab showing members of congress. 
+tab showing members of congress.  This module is depricated and will eventually be removed.  
+You should probably use the Views integration instead.
 
 
 * DEVELOPED BY *
