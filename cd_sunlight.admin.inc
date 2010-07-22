@@ -41,7 +41,7 @@ function cd_sunlight_settings_form() {
       '#title' => t('Cron server load limit'),
       '#description' => t('Do not run Cron CD lookups if the system load is higher than this value. '
         . 'Only applicable to Linux based servers. '),
-      '#default_value' => variable_get('cd_sunlight_cron_load_limit', 2),
+      '#default_value' => variable_get('cd_sunlight_cron_load_limit', 6),
     );
   }
 

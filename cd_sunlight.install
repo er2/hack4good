@@ -59,7 +59,7 @@ function cd_sunlight_schema() {
   );
 
   $schema['cd_sunlight_legislators'] = array(
-    'description' => t('The current legislators as returned by the Sunlight API'),
+    'description' => t('The current members of Congress as returned by the Sunlight API.'),
     'fields' => array(
       'legislator_id' => array(
         'description' => t('Autoincrementing primary key.'),

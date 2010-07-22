@@ -121,7 +121,7 @@ function cd_sunlight_cron() {
   // Only run under low server load.
   if (function_exists('sys_getloadavg')) {
     list($load) = sys_getloadavg();
-    $limit = variable_get('cd_sunlight_cron_load_limit', 2);
+    $limit = variable_get('cd_sunlight_cron_load_limit', 6);
     if (is_numeric($load) && !empty($limit) && $load > $limit) {
       watchdog('cd_sunlight', 'System load is higher than @limit, cd_sunlight_cron will not be run.',
         array('@limit' => $limit), WATCHDOG_WARNING);
@@ -348,11 +348,20 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
 }
 
 /**
+ * Implementation of hook_views_api().
+ */
+function cd_sunlight_views_api() {
+  return array(
+    'api' => '2.0',
+  );
+}
+
+/**
  * @category API
  */
 
 /**
- * Queue a contact to have its CD retreived from Sunlight on the next cron run.
+ * Queue a contact to have its CD retrieved from Sunlight on the next cron run.
  *
  * @param $contact_id
  *  CiviCRM Conact ID.
@@ -403,29 +412,41 @@ function cd_sunlight_contact_dequeue($contact_id) {
  * @return string
  *  ex. 'NY17' or NULL if not set/error.
  */
-function cd_sunlight_contact_get_cd($contact_id) {
+function cd_sunlight_contact_get_cd($contact_id, $reset = FALSE) {
+  static $contacts = array();
+  
+  if ($reset) {
+    $contacts = array();
+    return;
+  }
+  
+  if (!isset($contacts[$contact_id])) {
 
-  // Find the contact.
-  $params = array(
-    'contact_id' => $contact_id,
-    'return.' . CD_SUNLIGHT_CIVICRM_CD => TRUE,
-    'return.' . CD_SUNLIGHT_CIVICRM_CD_OVERRIDE => TRUE,
-  );
-  $contact = _cd_sunlight_civicrm_contact_get($params);
-  if (civicrm_error($contact)) {
-    $backtrace = _cd_sunlight_backtrace();
-    watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
-      array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
-      l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
-    return FALSE;
+    // Find the contact.
+    $params = array(
+      'contact_id' => $contact_id,
+      'return.' . CD_SUNLIGHT_CIVICRM_CD => TRUE,
+      'return.' . CD_SUNLIGHT_CIVICRM_CD_OVERRIDE => TRUE,
+    );
+    $contact = _cd_sunlight_civicrm_contact_get($params);
+    if (civicrm_error($contact)) {
+      $backtrace = _cd_sunlight_backtrace();
+      watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
+        array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
+        l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
+      $contacts[$contact_id] = FALSE;
+    }
+    elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE])) {
+      $contacts[$contact_id] = $contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE];
+    }
+    elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD])) {
+      $contacts[$contact_id] = $contact[CD_SUNLIGHT_CIVICRM_CD];
+    }
+    else {
+      $contacts[$contact_id] = NULL;
+    }
   }
-  elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE])) {
-    return $contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE];
-  }
-  elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD])) {
-    return $contact[CD_SUNLIGHT_CIVICRM_CD];
-  }
-  return NULL;
+  return $contacts[$contact_id];
 }
 
 /**
@@ -1563,17 +1584,25 @@ function _cd_sunlight_contact_set_cd($contact_id, $cd = NULL, $override = NULL) 
     $contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE] = $override;
   }
 
+  // Set the semaphore.
   _cd_sunlight_contact_set_cd_is_running(TRUE);
-  if (civicrm_error($contact = civicrm_contact_add($contact))) {
+  
+  $contact = civicrm_contact_add($contact);
+  
+  // Reset the semaphore.
+  _cd_sunlight_contact_set_cd_is_running(FALSE);
+
+  // Reset our static cache.
+  cd_sunlight_contact_get_cd($contact_id, TRUE);
+  
+  if (civicrm_error($contact)) {
     $backtrace = _cd_sunlight_backtrace();
     watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
-      array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
+      array('@backtrace' => $backtrace, '@contact' => var_export($contact, TRUE)), WATCHDOG_ERROR,
       l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id))
     );
-    _cd_sunlight_contact_set_cd_is_running(FALSE);
     return FALSE;
   }
-  _cd_sunlight_contact_set_cd_is_running(FALSE);
   return TRUE;
 }
 
@@ -2076,9 +2105,18 @@ function _cd_sunlight_civicrm_contact_get($search_params) {
   if (!isset($contact['contact_id'])) {
     $contact = array_shift($contact);
     if (!isset($contact['contact_id'])) {
-      watchdog('cd_sunlight',
-        'CiviCRM is doing strange things.  This version of CiviCRM may not be supported.', array(),
-        WATCHDOG_ERROR);
+      $backtrace = _cd_sunlight_backtrace();
+      $t_args = array(
+        '@backtrace' => $backtrace,
+        '@search_params' => var_export($search_params, TRUE),
+        '@contact' => var_export($contact, TRUE)
+      );
+      watchdog(
+        'cd_sunlight',
+        'Error getting contact. This version of CiviCRM may not be supported. @search_params @backtrace @contact',
+        $t_args,
+        WATCHDOG_ERROR
+      );
     }
   }
   return $contact;
@@ -2109,7 +2147,7 @@ function _cd_sunlight_backtrace() {
       }
       $arg_string = '('. implode(', ', $arg_scalars) .')';
     }
-    $info[] = "$trace[file]($trace[line]): $trace[function]$arg_string";
+    $info[] = @"$trace[file]($trace[line]): $trace[function]$arg_string";
   }
   return var_export($info, TRUE);
 }
@@ -2144,4 +2182,88 @@ function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
   $params = array( 1 => array( $timeout, 'Integer' ) );
   CRM_Core_DAO::executeQuery('SET SESSION wait_timeout = %1', $params);
 
+}
+
+/**
+ * Given the URL of a remote image, fetch it locally and cache.
+ * 
+ * @param string $url 
+ * 
+ * @return string
+ *  the path of the local file (relative to the Drupal files directory). Or 0 on error.
+ */
+function _cd_sunlight_remote_image_fetch($url) {
+  static $images = array();
+  static $retries = 0;
+  $key = 'cd_sunlight_image_'. md5($url);
+  if (isset($images[$key])) {
+    $local_url = $images[$key];
+  }
+  else {
+    $cache = cache_get($key);
+    if (isset($cache->data)) {
+      $local_url = $cache->data;
+    }
+    else {
+      $local_url = 0;
+      if ($image = _cd_sunlight_is_url_an_image($url)) {
+        $path = parse_url($url, PHP_URL_PATH);
+        $extension = substr($path, strrpos($path, '.') + 1);
+        $local_url = _cd_sunlight_save_data_locally($image, $key .'.'. $extension);
+      }
+      cache_set($key, $local_url);
+    }
+    $images[$key] = $local_url;
+  }
+  if ($images[$key] && !file_exists($images[$key])) {
+    if ($retries++) {
+      watchdog('cd_sunlight', 'Preventing infinite loop due to file not saving', array(), WATCHDOG_ERROR);
+      $retries == 0;
+      return 0;
+    }
+    unset($images[$key]);
+    cache_clear_all($key, 'cache');
+    _cd_sunlight_remote_image_fetch($url);
+  }
+  return $images[$key];
+}
+
+/**
+ * Tests if the URL is likely to point to an image.  Not 100% accurate.
+ *
+ * @param string $url
+ *
+ * @return mixed
+ *  The image data if the URL points to an image, else FALSE.
+ */
+function _cd_sunlight_is_url_an_image($url) {
+  $response = drupal_http_request($url);
+  if (
+    $response->code == 200 || $response->code == 301 &&
+    isset($response->headers['Content-Type']) &&
+    strpos(strtolower($response->headers['Content-Type']), 'image') !== FALSE &&
+    !empty($response->data)
+  ) {
+    return $response->data;
+  }
+  return FALSE;
+}
+
+/**
+ * Save a remote file on the local filesystem.
+ *
+ * @param string $data
+ *  The contents of the file.
+ * @param string $filename
+ *  The name to save it to.  It is the callers responsibility to ensure that this file has a safe
+ *  extension (i.e. no PHP files).
+ *
+ * @return mixed
+ *  the path of the local file (relative to the Drupal files directory). Or 0 on error.
+ */
+function _cd_sunlight_save_data_locally($data, $filename) {
+  $directory = file_create_path('cd_sunlight');
+  file_check_directory($directory, FILE_CREATE_DIRECTORY);
+  $filename = file_create_filename($filename, $directory);
+  return file_save_data($data, $filename, FILE_EXISTS_REPLACE);
 }
