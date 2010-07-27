@@ -69,6 +69,15 @@ function cd_sunlight_views_data() {
       'handler' => 'views_handler_sort',
     ),
   );
+  $data['cd_sunlight_legislators']['chamber'] = array(
+    'real field' => 'title',
+    'title' => t('Chamber'),
+    'help' => t('"Senate" or "House".'),
+    'field' => array(
+      'handler' => 'views_handler_field_chamber',
+      'click sortable' => TRUE,
+    ),
+  );
   $data['cd_sunlight_legislators']['party'] = array(
     'title' => t('Party'),
     'field' => array(
@@ -287,6 +296,10 @@ function cd_sunlight_views_handlers() {
       'views_handler_filter_district_current_user' => array(
         'parent' => 'views_handler_filter_boolean_operator',
         'file' => 'cd_sunlight.views_handler_filter_current_user.inc',
+      ),
+      'views_handler_field_chamber' => array(
+        'parent' => 'views_handler_field',
+        'file' => 'cd_sunlight.views_handler_field_chamber.inc',
       ),
       'views_handler_field_url_favicon' => array(
         'parent' => 'views_handler_field_url',

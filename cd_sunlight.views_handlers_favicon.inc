@@ -68,7 +68,7 @@ class views_handler_field_url_favicon extends views_handler_field_url {
       return l($value, $this->url_path, array('html' => TRUE, 'query' => $this->url_query));
     }
     else {
-      return check_plain($this->url_path .'?'. $this->url_path);
+      return check_plain($this->url_path .($this->url_query ? '?' : ''). $this->url_query);
     }
   }
 
@@ -201,13 +201,27 @@ class views_handler_field_url_favicon_twitter extends views_handler_field_url_fa
 class views_handler_field_url_favicon_generic extends views_handler_field_url_favicon {
 
   function render($values) {
-    $url = parse_url($values->{$this->field_alias});
-    $this->favicon_url = $url['scheme'] .'://'. $url['host'] .'/favicon.ico';
     if (empty($this->human_readable)) {
       $this->human_readable = '';
     }
-    $this->url_path = $url['scheme'] .'://'. $url['host'] .''. $url['path'];
-    $this->url_query = isset($url['query']) ? $url['query'] : NULL;
+    $url = parse_url($values->{$this->field_alias});
+    // Check for a bad URL.
+    if (empty($url['host'])) {
+      $this->favicon_url = '';
+      $this->url_path = $values->{$this->field_alias};
+      $this->url_query = NULL;
+    }
+    else {
+      if (empty($url['scheme'])) {
+        $url['scheme'] = 'http';
+      }
+      if (empty($url['path'])) {
+        $url['path'] = '/';
+      }
+      $this->favicon_url = $url['scheme'] .'://'. $url['host'] .'/favicon.ico';
+      $this->url_path = $url['scheme'] .'://'. $url['host'] .''. $url['path'];
+      $this->url_query = isset($url['query']) ? $url['query'] : NULL;
+    }
     return parent::render($values);
   }
 

@@ -19,6 +19,35 @@ function cd_sunlight_views_default_views() {
   $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
   $handler = $view->new_display('default', 'Defaults', 'default');
   $handler->override_option('fields', array(
+    'chamber' => array(
+      'label' => '',
+      'alter' => array(
+        'alter_text' => 1,
+        'text' => '<h3>[chamber]</h3>',
+        'make_link' => 0,
+        'path' => '',
+        'link_class' => '',
+        'alt' => '',
+        'prefix' => '',
+        'suffix' => '',
+        'target' => '',
+        'help' => '',
+        'trim' => 0,
+        'max_length' => '',
+        'word_boundary' => 1,
+        'ellipsis' => 1,
+        'html' => 0,
+        'strip_tags' => 0,
+      ),
+      'empty' => '',
+      'hide_empty' => 0,
+      'empty_zero' => 0,
+      'exclude' => 1,
+      'id' => 'chamber',
+      'table' => 'cd_sunlight_legislators',
+      'field' => 'chamber',
+      'relationship' => 'none',
+    ),
     'picture' => array(
       'label' => '',
       'alter' => array(
@@ -571,6 +600,11 @@ function cd_sunlight_views_default_views() {
   $handler->override_option('use_pager', '1');
   $handler->override_option('use_more', 1);
   $handler->override_option('use_more_always', 0);
+  $handler->override_option('style_plugin', 'list');
+  $handler->override_option('style_options', array(
+    'grouping' => 'chamber',
+    'type' => 'ul',
+  ));
   $handler->override_option('row_options', array(
     'inline' => array(
       'title' => 'title',
@@ -756,7 +790,8 @@ function cd_sunlight_views_default_views() {
     'description' => '',
     'weight' => 0,
     'name' => 'navigation',
-  ));
+));
+
   $views[$view->name] = $view;
 
   return $views;
