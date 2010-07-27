@@ -1,4 +1,5 @@
 <?php
+// $Id$
 
 /**
  * @file
@@ -61,7 +62,7 @@ class views_handler_field_url_favicon extends views_handler_field_url {
 
     }
     if (!empty($this->options['display_as_link'])) {
-      if(empty($value)) {
+      if (empty($value)) {
         $value = check_plain($this->human_readable);
       }
       return l($value, $this->url_path, array('html' => TRUE, 'query' => $this->url_query));

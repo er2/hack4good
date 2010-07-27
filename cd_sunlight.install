@@ -369,7 +369,7 @@ function cd_sunlight_update_6001() {
   }
 
   // Drop the old table.
-  $ret[] = update_sql('DROP TABLE {cd_sunlight_cron}');
+  db_drop_table($ret, 'cd_sunlight_cron');
 
   // Recreate the table.
   $table = array(

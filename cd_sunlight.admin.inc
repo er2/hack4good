@@ -74,7 +74,7 @@ function cd_sunlight_settings_form() {
     '#title' => t('CiviCRM command-line script key'),
     '#type' => 'item',
     '#value' => defined('CIVICRM_SITE_KEY') ? 'Is defined' : 'Is not defined',
-    '#description' => t('The CiviCRM command-line key. '),
+    '#description' => t('The CiviCRM command-line key.'),
   );
   $form['geocode']['cd_sunlight_geocode_crypt'] = array(
     '#title' => t('Crypt libraries'),
@@ -201,8 +201,7 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
     if (_cd_sunlight_crypt_enabled()) {
       $user_name_encrypted =
         _cd_sunlight_crypt_encrypt($user_name);
-      form_set_value($form['geocode']['cd_sunlight_geocode_username'],
-        $user_name_encrypted, $form_state);
+      $form_state['values']['cd_sunlight_geocode_username'] = $user_name_encrypted;
     }
   }
 
@@ -211,12 +210,10 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
     if (_cd_sunlight_crypt_enabled()) {
       $http_user_encrypted =
         _cd_sunlight_crypt_encrypt($http_user);
-      form_set_value($form['geocode']['http_auth']['cd_sunlight_http_auth_user'],
-        $http_user_encrypted, $form_state);
+      $form_state['values']['cd_sunlight_http_auth_user'] = $http_user_encrypted;
       $http_password_encrypted =
         _cd_sunlight_crypt_encrypt($form_state['values']['cd_sunlight_http_auth_password']);
-      form_set_value($form['geocode']['http_auth']['cd_sunlight_http_auth_password'],
-        $http_password_encrypted, $form_state);
+      $form_state['values']['cd_sunlight_http_auth_password'] = $http_password_encrypted;
     }
   }
 
@@ -389,7 +386,7 @@ function cd_sunlight_batch(&$context) {
     $contact = _cd_sunlight_civicrm_contact_get(array('contact_id' => $contact['id']));
     if (civicrm_error($contact)) {
       $context['success'] = FALSE;
-      $context['error_message'] = t('There was a CiviCRM API error. ');
+      $context['error_message'] = t('There was a CiviCRM API error.');
       return;
     }
     cd_sunlight_validate_civicrm_data($contact);

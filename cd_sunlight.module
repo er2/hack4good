@@ -14,7 +14,11 @@
  *    single digit districts shall have no leading zeros.
  *  zone - A region: either 'state' or 'cd'.
  *
- * @todo _cd_sunlight_validate* functions should be split into validate and clean functions. 
+ * @todo _cd_sunlight_validate* functions should be split into validate and clean functions.
+ * 
+ * @todo Now that we rely on Views, there must be table prefixes in $db_prefix.  So for all of our
+ *    admin queries we should use prefixes rather than switch back-n-forth with db_set_active().
+ *    requirements should be updated as well. 
  */
 
 /**
