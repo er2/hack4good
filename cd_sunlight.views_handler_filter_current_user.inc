@@ -49,10 +49,9 @@ class views_handler_filter_district_current_user extends views_handler_filter {
 
   function query() {
     $this->ensure_my_table();
-    $where = "$this->table_alias.$this->real_field = ***CURRENT_USERS_DISTRICT***";
 
-    // Senators have a CD of 0.
-    $where = '(' . $where . " OR $this->table_alias.$this->real_field = 0)";
+    // Remember that senators have a CD of 0.
+    $where = "$this->table_alias.$this->real_field IN (***CURRENT_USERS_DISTRICT***, 0)";
     
     $this->query->add_where($this->options['group'], $where);
   }
