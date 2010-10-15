@@ -264,12 +264,23 @@ function cd_sunlight_requirements($phase) {
     }
     $requirements['cd_sunlight_db'] = array(
       'title' => 'CD Sunlight',
-      'description' => t('In settings.php $db_prefix must be an array and you must have prefixes '.
-        'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a>.',
-        array('%tables' => implode(', ', $civicrm_tables), '!url' => url('civicrm/admin/setting/uf'))),
+      'description' => t('In %settings $db_prefix must be an array and you must have prefixes '.
+        'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a> '.
+        'for more info.',
+        array(
+          '%tables' => implode(', ', $civicrm_tables),
+          '!url' => url('civicrm/admin/setting/uf'),
+          '%settings' => conf_path() .'/settings.php',
+        )),
       'severity' => $error_tables ? REQUIREMENT_ERROR : REQUIREMENT_OK,
       'value' => t('settings.php DB Prefix'),
     );
+
+    // If we already have an error, don't bother continuing, it will only confuse the admin.
+    // They need to get the above sorted out before they can do anything. 
+    if ($error_tables) {
+      return $requirements;
+    }
 
     // Raise an error if a the module has not been setup.
     if (

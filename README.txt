@@ -7,43 +7,57 @@ $Id$
 
 This module provides a way to automatically get congressional district information about your
 contacts into CiviCRM using the Sunlight API.
-http://wiki.sunlightlabs.com/Sunlight_API_Documentation
+  http://wiki.sunlightlabs.com/Sunlight_API_Documentation
 It also fetches data about the current members of congress.  You can access all this data via an
 API or use the Views module.
 
 
 * INSTALL *
 
-1)Configure the module at /admin/settings/cd_sunlight
+1)Unpack the modules files just like any other Drupal module.  Probably at something like:
+    sites/all/modules/contrib/cd_sunlight
+
+2)Navigate to
+    /admin/reports/status
+  To get instructions on how to configure your settings.php to use the module.  Specifically you
+  must have prefixes for several CiviCRM tables in settings.php.  Ignore other CD Sunlight errors
+
+3)Configure the module at
+    /admin/settings/cd_sunlight
   Specifically the Sunlight API key.
 
-2)Link with CiviCRM fields as /admin/settings/cd_sunlight/fields
+4)Link with CiviCRM fields at
+    /admin/settings/cd_sunlight/fields
 
-3)Make sure you have an entry in db_url for civicrm in your settings.php file.  Something like:
-    $db_url = array(
-      'default' => 'mysqli://user:pass@localhost/drupal',
-      'civicrm' => 'mysqli://user:pass@localhost/civicrm',
-    );
-  Make sure to use the same schema for both database ULRs (mysqli, mysql, pgsql).
+5)Return to the status report to see if the module is reporting any problems
+    /admin/reports/status
 
-4)Navigate to /admin/reports/status to see if the module is reporting any problems.
+6)If you wish you can enqueue all CiviCRM contacts to have their congressional district retrieved
+  during the next cron run at
+    /admin/settings/cd_sunlight/batch
 
-5)Batch process all contacts at /admin/settings/cd_sunlight/batch
+7)Edit a contact and change the postal code to enqueue the contact for lookup.  The Congressional
+  District will be retrieved the next time cron is run.  When a contact is edited from a CiviCRM 
+  profile (ex. /user/12345/edit/[civicrm profile name]) the congressional district will be 
+  immediately retrieved.
 
-6)Edit a contact and change the postal code to enqueue the contact for lookup.  The Congressional
-  District will be retrieved the next time cron is run.
 
 
 * VIEWS INTEGRATION *
 
-Once you've installed the Views module, you can find the default view at 
-/admin/build/views
-called "Congress".  You can either customize it or create a new view of the type "Congress".
+To show information about members of Congress on your site you need to install the Views module.
+  http://drupal.org/project/views
+You can find the default view called "Congress" at
+  /admin/build/views
+You can either customize it or create a new view of the type "Congress".
 
 
 * USING THE API *
 
-Here are the functions.  See the docbook comments for more info.
+The API should only be used in situations where Views cannot be used.  In the future the Views 
+integration will likely see more tending than the API.  Here are the API functions.  See the
+docbook comments for more info.
+
 cd_sunlight_contact_enqueue($contact_id) 
 cd_sunlight_contact_dequeue($contact_id) 
 cd_sunlight_contact_get_cd($contact_id) 
@@ -66,9 +80,9 @@ cd_sunlight_state_name2abbr($state_name);
 
 * CONGRESS MODULE *
 
-The congress module is an example implementation of the API.  It provides a few blocks and a user
-tab showing members of congress.  This module is depricated and will eventually be removed.  
-You should probably use the Views integration instead.
+DEPRICATED.  The congress module is an example implementation of the API.  New users should use
+Views instead.  It will be removed in cd_sunlight 3.x or Drupal 7 (whichever comes first) existing
+users should replace with Views before then.
 
 
 * DEVELOPED BY *
