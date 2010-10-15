@@ -1,4 +1,5 @@
 <?php
+//$Id$
 
 /* 
  * @file
@@ -228,10 +229,10 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
 function cd_sunlight_settings_fields_form() {
 
   // Get options.
-  db_set_active('civicrm');
-  $resource = db_query('SELECT id, custom_group_id, label FROM civicrm_custom_field
-    WHERE data_type = "string" ORDER BY custom_group_id, weight');
-  db_set_active();
+  $resource = db_query('SELECT id, custom_group_id, label 
+    FROM {civicrm_custom_field}
+    WHERE data_type = "string"
+    ORDER BY custom_group_id, weight');
   $fields = array();
   while ($field = db_fetch_array($resource)) {
     $fields[$field['id']] = $field['custom_group_id'] .': '. check_plain($field['label']);
@@ -286,12 +287,14 @@ function cd_sunlight_settings_fields_form() {
 function cd_sunlight_settings_fields_form_validate($form, &$form_state) {
 
   // Check that both fields are in the same table.
-  db_set_active('civicrm');
-  $table_1 = db_result(db_query('SELECT custom_group_id FROM civicrm_custom_field
-    WHERE id = %d', $form_state['values']['field_cd_sunlight_civicrm_cd']));
-  $table_2 = db_result(db_query('SELECT custom_group_id FROM civicrm_custom_field
-    WHERE id = %d', $form_state['values']['field_cd_sunlight_civicrm_cd_override']));
-  db_set_active();
+  $table_1 = db_result(db_query('SELECT custom_group_id
+    FROM {civicrm_custom_field}
+    WHERE id = %d',
+    $form_state['values']['field_cd_sunlight_civicrm_cd']));
+  $table_2 = db_result(db_query('SELECT custom_group_id
+    FROM {civicrm_custom_field}
+    WHERE id = %d',
+    $form_state['values']['field_cd_sunlight_civicrm_cd_override']));
   if ($table_1 != $table_2) {
     form_set_error('field_cd_sunlight_civicrm_cd_override'
       , t('Choose two fields from the same group.'));
@@ -301,18 +304,16 @@ function cd_sunlight_settings_fields_form_validate($form, &$form_state) {
 function cd_sunlight_settings_fields_form_submit($form, &$form_state) {
 
   // Retrieve the fields data.
-  db_set_active('civicrm');
   $field_cd_sunlight_civicrm_cd = db_fetch_object(db_query('SELECT f.id, f.column_name, g.table_name
-    FROM civicrm_custom_field f
-    INNER JOIN civicrm_custom_group g
+    FROM {civicrm_custom_field} f
+    INNER JOIN {civicrm_custom_group} g
       ON f.custom_group_id = g.id
     WHERE f.id = %d', $form_state['values']['field_cd_sunlight_civicrm_cd']));
   $field_cd_sunlight_civicrm_cd_override = db_fetch_object(db_query('SELECT f.id, f.column_name, g.table_name
-    FROM civicrm_custom_field f
-    INNER JOIN civicrm_custom_group g
+    FROM {civicrm_custom_field} f
+    INNER JOIN {civicrm_custom_group} g
       ON f.custom_group_id = g.id
     WHERE f.id = %d', $form_state['values']['field_cd_sunlight_civicrm_cd_override']));
-  db_set_active();
 
   // Save the variables.
   variable_set('cd_sunlight_civicrm_custom_table',
@@ -369,19 +370,15 @@ function cd_sunlight_batch(&$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['contact_id'] = 0;
-    db_set_active('civicrm');
-    $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(*) FROM civicrm_contact'));
-    db_set_active();
+    $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(*) FROM {civicrm_contact}'));
   }
 
   // Iterate through the contacts.
-  db_set_active('civicrm');
   $res = db_query('SELECT id
-    FROM civicrm_contact
+    FROM {civicrm_contact}
     WHERE id > %d
     ORDER BY id LIMIT 0, '. $limit,
     $context['sandbox']['contact_id']);
-  db_set_active();
   while ($contact = db_fetch_array($res)) {
     $contact = _cd_sunlight_civicrm_contact_get(array('contact_id' => $contact['id']));
     if (civicrm_error($contact)) {

@@ -275,6 +275,14 @@ function cd_sunlight_views_data() {
       'handler' => 'views_handler_field_congress_picture',
     ),
   );
+  $data['cd_sunlight_legislators']['progressive_punch'] = array(
+    'field' => array(
+      'title' => t('Progressive Punch Page'),
+      'help' => t('http://progressivepunch.org'),
+      'handler' => 'views_handler_field_url_favicon_progressive_punch',
+    ),
+
+  );
 
   return $data;
 }
@@ -283,67 +291,88 @@ function cd_sunlight_views_data() {
  * Implementation of hook_views_handlers().
  */
 function cd_sunlight_views_handlers() {
+  $path = drupal_get_path('module', 'cd_sunlight') .'/views';
   return array(
     'handlers' => array(
       'views_handler_field_congress_picture' => array(
         'parent' => 'views_handler_field',
         'file' => 'cd_sunlight.views_handler_field_congress_picture.inc',
+        'path' => $path,
       ),
       'views_handler_filter_state_current_user' => array(
         'parent' => 'views_handler_filter_boolean_operator',
         'file' => 'cd_sunlight.views_handler_filter_current_user.inc',
+        'path' => $path,
       ),
       'views_handler_filter_district_current_user' => array(
         'parent' => 'views_handler_filter_boolean_operator',
         'file' => 'cd_sunlight.views_handler_filter_current_user.inc',
+        'path' => $path,
       ),
       'views_handler_field_chamber' => array(
         'parent' => 'views_handler_field',
         'file' => 'cd_sunlight.views_handler_field_chamber.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon' => array(
         'parent' => 'views_handler_field_url',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_youtube' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_bioguide' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_votesmart' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_govtrack' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_opensecrets' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_congresspedia' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_twitter' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_generic' => array(
         'parent' => 'views_handler_field_url_favicon',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_webform' => array(
         'parent' => 'views_handler_field_url_favicon_generic',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
       'views_handler_field_url_favicon_website' => array(
         'parent' => 'views_handler_field_url_favicon_generic',
         'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
+      ),
+      'views_handler_field_url_favicon_progressive_punch' => array(
+        'parent' => 'views_handler_field_url_favicon',
+        'file' => 'cd_sunlight.views_handlers_favicon.inc',
+        'path' => $path,
       ),
     ),
   );
@@ -355,13 +384,15 @@ function cd_sunlight_views_handlers() {
 function cd_sunlight_views_query_substitutions($view) {
   global $user;
   $substitutions = array();
-  $substitutions['***CURRENT_USERS_STATE***'] = 'NULL';
-  $substitutions['***CURRENT_USERS_DISTRICT***'] = 'NULL';
-  if ($user->uid && $view->base_table == 'cd_sunlight_legislators') {
-    $cd = cd_sunlight_user_get_cd($user->uid);
-    if ($cd && $cd != 'not found') {
-      $substitutions['***CURRENT_USERS_STATE***'] = "'". cd_sunlight_cd_parse_state($cd) ."'";
-      $substitutions['***CURRENT_USERS_DISTRICT***'] = cd_sunlight_cd_parse_district($cd);
+  if ($view->base_table == 'cd_sunlight_legislators') {
+    $substitutions['***CURRENT_USERS_STATE***'] = 'NULL';
+    $substitutions['***CURRENT_USERS_DISTRICT***'] = 'NULL';
+    if ($user->uid) {
+      $cd = cd_sunlight_user_get_cd($user->uid);
+      if ($cd && $cd != 'not found') {
+        $substitutions['***CURRENT_USERS_STATE***'] = "'". cd_sunlight_cd_parse_state($cd) ."'";
+        $substitutions['***CURRENT_USERS_DISTRICT***'] = intval(cd_sunlight_cd_parse_district($cd));
+      }
     }
   }
   return $substitutions;

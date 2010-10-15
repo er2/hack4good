@@ -16,9 +16,6 @@
  *
  * @todo _cd_sunlight_validate* functions should be split into validate and clean functions.
  * 
- * @todo Now that we rely on Views, there must be table prefixes in $db_prefix.  So for all of our
- *    admin queries we should use prefixes rather than switch back-n-forth with db_set_active().
- *    requirements should be updated as well. 
  */
 
 /**
@@ -357,6 +354,7 @@ function cd_sunlight_civicrm_post($op, $object_type, $contact_id, $ref) {
 function cd_sunlight_views_api() {
   return array(
     'api' => '2.0',
+    'path' => drupal_get_path('module', 'cd_sunlight') .'/views',
   );
 }
 
@@ -407,6 +405,11 @@ function cd_sunlight_contact_enqueue($contact_id) {
 function cd_sunlight_contact_dequeue($contact_id) {
   db_query('UPDATE {cd_sunlight_cron} SET processed = 1 WHERE contact_id = %d and processed = 0',
     $contact_id);
+  // Clear any block cache for our views.
+  if (db_table_exists('cache_block') && $uid = _cd_sunlight_contact_id_get_uid($contact_id)) {
+    // Can't use the API here because we need a wildcard in the middle.
+    db_query('DELETE FROM {cache_block} WHERE cid LIKE "%s"', 'views:Congress%:u.'. $uid);
+  }
 }
 
 /**
@@ -427,20 +430,15 @@ function cd_sunlight_contact_get_cd($contact_id, $reset = FALSE) {
   if (!isset($contacts[$contact_id])) {
 
     // Find the contact.
-    $params = array(
-      'contact_id' => $contact_id,
-      'return.' . CD_SUNLIGHT_CIVICRM_CD => TRUE,
-      'return.' . CD_SUNLIGHT_CIVICRM_CD_OVERRIDE => TRUE,
-    );
-    $contact = _cd_sunlight_civicrm_contact_get($params);
-    if (civicrm_error($contact)) {
-      $backtrace = _cd_sunlight_backtrace();
-      watchdog('cd_sunlight', 'CiviCRM API error: @backtrace @contact',
-        array('@backtrace' => $backtrace, '@contact' => $contact), WATCHDOG_ERROR,
-        l('view', 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id)));
-      $contacts[$contact_id] = FALSE;
-    }
-    elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE])) {
+    // The CiviCRM API is totally not performant.
+    // A manual query will be just as easy and far faster.
+    $sql = 'SELECT '.
+        CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS '. CD_SUNLIGHT_CIVICRM_CD  .', '.
+        CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS '. CD_SUNLIGHT_CIVICRM_CD_OVERRIDE .
+      ' FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} '.
+      ' WHERE entity_id = %d';
+    $contact = db_fetch_array(db_query($sql, $contact_id));
+    if (!empty($contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE])) {
       $contacts[$contact_id] = $contact[CD_SUNLIGHT_CIVICRM_CD_OVERRIDE];
     }
     elseif (!empty($contact[CD_SUNLIGHT_CIVICRM_CD])) {
@@ -488,7 +486,7 @@ function cd_sunlight_contact_get_district($contact_id) {
  *  ex. 'NY17' or 'not found' or NULL if not yet set/error.
  */
 function cd_sunlight_user_get_cd($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
+  if ($contact_id = _cd_sunlight_uid_get_contact_id($uid)) {
     return cd_sunlight_contact_get_cd($contact_id);
   }
 }
@@ -504,7 +502,7 @@ function cd_sunlight_user_get_cd($uid) {
  *  ex. 'NY', or NULL if not set.
  */
 function cd_sunlight_user_get_state($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
+  if ($contact_id = _cd_sunlight_uid_get_contact_id($uid)) {
     return cd_sunlight_contact_get_state($contact_id);
   }
 }
@@ -517,7 +515,7 @@ function cd_sunlight_user_get_state($uid) {
  *  ex. 17 or NULL if not set.
  */
 function cd_sunlight_user_get_district($uid) {
-  if ($contact_id = _cd_sunlight_user_get_contact_id($uid)) {
+  if ($contact_id = _cd_sunlight_uid_get_contact_id($uid)) {
     return cd_sunlight_contact_get_district($contact_id);
   }
 }
@@ -604,15 +602,13 @@ function cd_sunlight_cd_load($cd, $return_properties = array('legislators')) {
  */
 function cd_sunlight_cd_get_all_used() {
   $cds = array();
-  db_set_active('civicrm');
   $res = db_query('SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' AS cd '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} '.
     'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' '.
     'UNION SELECT '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS cd '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} '.
     'GROUP BY '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE
   );
-  db_set_active();
   while ($cd = db_fetch_object($res)) {
     if (!empty($cd->cd) && _cd_sunlight_validate_cd($cd->cd)) {
       $cds[$cd->cd] = $cd->cd;
@@ -866,14 +862,13 @@ function cd_sunlight_contacts_geocode() {
   }
 
   // Get start and end IDs.
-  db_set_active('civicrm');
   // CiviCRM has a bug where because it doesn't save a special value for addresses that fail geocoding,
   // it ends up processing the same records over and over again.  So to get around this we will choose a
   // random contact_id to start with.
-  $max_id = db_result(db_query('SELECT MAX(id) FROM civicrm_contact'));
+  $max_id = db_result(db_query('SELECT MAX(id) FROM {civicrm_contact}'));
   $random_id = mt_rand(1, $max_id);
   $start_id = db_result(db_query('SELECT contact_id
-    FROM civicrm_address
+    FROM {civicrm_address}
     WHERE (geo_code_1 IS NULL OR geo_code_1 = 0)
       AND country_id IS NOT NULL
       AND contact_id > %d
@@ -882,7 +877,7 @@ function cd_sunlight_contacts_geocode() {
   if (empty($start_id)) {
     // None found.  Are there any records to geocode?
     $start_id = db_result(db_query('SELECT contact_id
-      FROM civicrm_address
+      FROM {civicrm_address}
       WHERE (geo_code_1 IS NULL OR geo_code_1 = 0)
         AND country_id IS NOT NULL
       ORDER BY contact_id
@@ -895,7 +890,7 @@ function cd_sunlight_contacts_geocode() {
   $end_id = db_result(db_query('SELECT MAX(contact_id)
     FROM (
       SELECT contact_id
-      FROM civicrm_address
+      FROM {civicrm_address}
       WHERE contact_id > %d
         AND (geo_code_1 IS NULL OR geo_code_1 = 0)
         AND country_id IS NOT NULL
@@ -909,7 +904,7 @@ function cd_sunlight_contacts_geocode() {
   $max_end_id = db_result(db_query('SELECT MAX(contact_id)
     FROM (
       SELECT contact_id
-      FROM civicrm_address a
+      FROM {civicrm_address} a
       WHERE contact_id > %d
       ORDER BY contact_id
       LIMIT %d
@@ -917,7 +912,6 @@ function cd_sunlight_contacts_geocode() {
   if (empty($end_id) || $end_id > $max_end_id) {
     $end_id = $max_end_id;
   }
-  db_set_active();
 
   // Build script parameters.
   $query = array(
@@ -979,6 +973,20 @@ function cd_sunlight_contacts_geocode() {
   }
 
   return $response;
+}
+
+/**
+ * Generate the url of the bioguide image for the given Bioguide ID.
+ *
+ * @param string $bioguide_id 
+ */
+function cd_sunlight_bioguide_image_url($bioguide_id) {
+  $letter = drupal_substr($bioguide_id, 0, 1);
+  $image_url = "http://bioguide.congress.gov/bioguide/photo/$letter/$bioguide_id.jpg";
+  if ($local_url = _cd_sunlight_remote_image_fetch($image_url)) {
+    return $local_url;
+  }
+  return $image_url;
 }
 
 /**
@@ -1210,7 +1218,7 @@ function _cd_sunlight_legislator_filter_fields($legislator) {
  * @return mixed $contact_id
  *  Integer if it exists, else NULL
  */
-function _cd_sunlight_user_get_contact_id($uid) {
+function _cd_sunlight_uid_get_contact_id($uid) {
   civicrm_initialize();
   require_once('api/UFGroup.php');
   if (!($contact_id = crm_uf_get_match_id($uid))) {
@@ -1221,6 +1229,20 @@ function _cd_sunlight_user_get_contact_id($uid) {
   }
   return $contact_id;
 }
+
+/**
+ * Lookup the contact's uid.
+ *
+ * @param integer $contact_id
+ * @return mixed $uid
+ *  Integer if it exists, else NULL
+ */
+function _cd_sunlight_contact_id_get_uid($contact_id) {
+  civicrm_initialize();
+  require_once('api/UFGroup.php');
+  return crm_uf_get_uf_id($contact_id);
+}
+
 
 /**
  * Update all members of congress that match a set of search parameters.
@@ -1776,11 +1798,10 @@ function _cd_sunlight_process_queue() {
 
     // Hooks don't fire during CiviCRM cron scripts.  Enqueue all contacts that have lat/long,
     // but not a CD.
-    db_set_active('civicrm');
     $res = db_query(
       'SELECT a.contact_id '.
-      'FROM civicrm_address a '.
-      'LEFT JOIN '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
+      'FROM {civicrm_address} a '.
+      'LEFT JOIN {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} c '.
         'ON c.entity_id = a.contact_id '.
       'WHERE ( '.
           'c.'. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
@@ -1802,7 +1823,6 @@ function _cd_sunlight_process_queue() {
           ') '.
         ') '
     );
-    db_set_active();
     $count = 0;
     while ($contact = db_fetch_object($res)) {
         // Some buggy versions of CiviCRM have addresses with no contact_id.
@@ -1900,21 +1920,19 @@ function _cd_sunlight_cd_get_contacts($cd) {
     return $contacts;
   }
 
-  db_set_active('civicrm');
   $sql = 'SELECT entity_id AS contact_id '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} '.
     'WHERE '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "%s" '.
     '  AND ('.
          CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' IS NULL'.
     '    OR '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' = ""'.
     '  ) '.
     'UNION SELECT entity_id AS contact_id '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' '.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} '.
     'WHERE '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' = "%s" ';
   $res = db_query($sql,
     $cd, $cd
   );
-  db_set_active();
   while ($contact = db_fetch_object($res)) {
     if (!empty($contact->contact_id)) {
       $contacts[] = $contact->contact_id;
@@ -1939,10 +1957,9 @@ function _cd_sunlight_cd_get_users($cd) {
     return $users;
   }
 
-  db_set_active('civicrm');
   $sql = 'SELECT m.uf_id AS uid '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
-    'INNER JOIN civicrm_uf_match m'.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} c '.
+    'INNER JOIN {civicrm_uf_match} m'.
     '  ON c.entity_id = m.contact_id '.
     'WHERE '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD .' = "%s" '.
     '  AND ('.
@@ -1950,12 +1967,11 @@ function _cd_sunlight_cd_get_users($cd) {
     '    OR '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' = ""'.
     '  ) '.
     'UNION SELECT m.uf_id AS uid '.
-    'FROM '. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .' c '.
-    'INNER JOIN civicrm_uf_match m'.
+    'FROM {'. CD_SUNLIGHT_CIVICRM_CUSTOM_TABLE .'} c '.
+    'INNER JOIN {civicrm_uf_match} m'.
     '  ON c.entity_id = m.contact_id '.
     'WHERE '. CD_SUNLIGHT_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' = "%s" ';
   $res = db_query($sql, $cd, $cd);
-  db_set_active();
   while ($user = db_fetch_object($res)) {
     if (!empty($user->uid)) {
       $users[] = $user->uid;
@@ -2011,14 +2027,13 @@ function _cd_sunlight_geocode_set($status = 'disabled', $set_database = FALSE) {
 
   // Save the value in the DB.
   if ($set_database) {
-    db_set_active('civicrm');
-    $config = db_result(db_query('SELECT config_backend FROM civicrm_domain WHERE id = 1'));
+    $config = db_result(db_query('SELECT config_backend FROM {civicrm_domain} WHERE id = 1'));
     $config = unserialize($config);
     if (isset($config['mapProvider'])) {
       $config['geocodeMethod'] = $config->geocodeMethod;
       $config = serialize($config);
       if (drupal_strlen($config) > 7) {
-        db_query('UPDATE civicrm_domain SET config_backend = "%s" WHERE id = 1', $config);
+        db_query('UPDATE {civicrm_domain} SET config_backend = "%s" WHERE id = 1', $config);
       }
       else {
         watchdog('cd_sunlight', 'The Geocoder for CiviCRM cannot be set.', array(), WATCHDOG_ERROR);
@@ -2028,7 +2043,6 @@ function _cd_sunlight_geocode_set($status = 'disabled', $set_database = FALSE) {
     else {
       return FALSE;
     }
-    db_set_active();
   }
   return TRUE;
 }
@@ -2241,7 +2255,9 @@ function _cd_sunlight_remote_image_fetch($url) {
  *  The image data if the URL points to an image, else FALSE.
  */
 function _cd_sunlight_is_url_an_image($url) {
-  $response = drupal_http_request($url);
+
+  // Shorten the default timeout - we don't want the page to hang because we're waiting on favicons.
+  $response = drupal_http_request($url, array(), 'GET', NULL, 2, 4);
   if (
     $response->code == 200 || $response->code == 301 &&
     isset($response->headers['Content-Type']) &&
@@ -2268,6 +2284,6 @@ function _cd_sunlight_is_url_an_image($url) {
 function _cd_sunlight_save_data_locally($data, $filename) {
   $directory = file_create_path('cd_sunlight');
   file_check_directory($directory, FILE_CREATE_DIRECTORY);
-  $filename = file_create_filename($filename, $directory);
+  $filename = $directory .'/'. $filename;
   return file_save_data($data, $filename, FILE_EXISTS_REPLACE);
 }

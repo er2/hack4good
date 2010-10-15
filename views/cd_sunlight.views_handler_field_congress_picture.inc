@@ -31,18 +31,8 @@ class views_handler_field_congress_picture extends views_handler_field {
       return '';
     }
 
-    $bioguide_id = $values->{$this->aliases['bioguide_id']};
-    $letter = drupal_substr($bioguide_id, 0, 1);
-    $images_url = "http://bioguide.congress.gov/bioguide/photo/$letter/$bioguide_id.jpg";
-
-    // Fetch image locally.
-    if ($local_url = _cd_sunlight_remote_image_fetch($images_url)) {
-      return theme('image', $local_url);
-    }
-    else {
-      return theme('image', $images_url);
-    }
-
+    $image_url = cd_sunlight_bioguide_image_url($values->{$this->aliases['bioguide_id']});
+    return theme('image', $image_url);
   }
 
 }

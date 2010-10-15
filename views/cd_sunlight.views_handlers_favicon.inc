@@ -32,6 +32,7 @@ class views_handler_field_url_favicon extends views_handler_field_url {
     $options = parent::option_definition();
 
     $options['display_as_favicon'] = array('default' => TRUE);
+    $options['new_window'] = array('default' => TRUE);
 
     return $options;
   }
@@ -45,6 +46,11 @@ class views_handler_field_url_favicon extends views_handler_field_url {
       '#title' => t('Display as favicon'),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['display_as_favicon']),
+    );
+    $form['new_window'] = array(
+      '#title' => t('Open link in a new window'),
+      '#type' => 'checkbox',
+      '#default_value' => !empty($this->options['new_window']),
     );
   }
 
@@ -65,10 +71,17 @@ class views_handler_field_url_favicon extends views_handler_field_url {
       if (empty($value)) {
         $value = check_plain($this->human_readable);
       }
-      return l($value, $this->url_path, array('html' => TRUE, 'query' => $this->url_query));
+      $l_options = array('html' => TRUE, 'query' => $this->url_query);
+      if (empty($this->options['display_as_favicon'])) {
+        $l_options['attributes']['title'] = $this->human_readable;
+      }
+      if (!empty($this->options['new_window'])) {
+        $l_options['attributes']['target'] = '_blank';
+      }
+      return l($value, $this->url_path, $l_options);
     }
     else {
-      return check_plain($this->url_path .($this->url_query ? '?' : ''). $this->url_query);
+      return check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query);
     }
   }
 
@@ -188,6 +201,55 @@ class views_handler_field_url_favicon_twitter extends views_handler_field_url_fa
     $this->human_readable = 'Twitter';
     $this->url_path = 'http://twitter.com/'. $values->{$this->field_alias};
     $this->url_query = NULL;
+    return parent::render($values);
+  }
+
+}
+
+/**
+ * Field handler to provide favicon for Progressive Punch.
+ *
+ * @ingroup views_field_handlers
+ */
+class views_handler_field_url_favicon_progressive_punch extends views_handler_field_url_favicon {
+
+  /**
+   * Add all the fields that we need.
+   */
+  function construct() {
+    parent::construct();
+    $this->additional_fields['state'] = 'state';
+    $this->additional_fields['district'] = 'district';
+    $this->additional_fields['title'] = 'title';
+    $this->additional_fields['senate_class'] = 'senate_class';
+  }
+
+  function query() {
+    $this->ensure_my_table();
+    $this->add_additional_fields();
+  }
+
+  function render($values) {
+    $this->favicon_url = 'http://progressivepunch.org/images/boxer_l2.jpg';
+    $this->human_readable = 'Progressive Punch';
+    $this->url_path = 'http://progressivepunch.org/members.jsp';
+
+    // Their URL structure sucks!  For reps it's fairly easy.
+    // For sens we need to use a more general call.
+    $query = array(
+      'state' => $values->{$this->aliases['state']},
+    );
+    if ($values->{$this->aliases['title']} == 'Rep') {
+      $query['district'] = $values->{$this->aliases['district']};
+    }
+    elseif ($senate_class = $values->{$this->aliases['senate_class']}) {
+      $query['member'] = $values->{$this->aliases['state']} . $senate_class;
+    }
+    $this->url_query = drupal_query_string_encode($query);
+
+    // parent::render checks if any data exists in the field.  We circumvent this check:
+    $values->{$this->field_alias} = TRUE;
+
     return parent::render($values);
   }
 

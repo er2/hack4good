@@ -2,6 +2,11 @@
 // $Id$
 
 /**
+ * @file
+ * Default view for CD Sunlight.
+ */
+
+/**
  * Implementation of hook_views_default_views().
  */
 function cd_sunlight_views_default_views() {
@@ -100,7 +105,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'title',
       'table' => 'cd_sunlight_legislators',
       'field' => 'title',
@@ -129,7 +134,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'firstname',
       'table' => 'cd_sunlight_legislators',
       'field' => 'firstname',
@@ -158,7 +163,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'middlename',
       'table' => 'cd_sunlight_legislators',
       'field' => 'middlename',
@@ -187,7 +192,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 1,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'nickname',
       'table' => 'cd_sunlight_legislators',
       'field' => 'nickname',
@@ -216,7 +221,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'lastname',
       'table' => 'cd_sunlight_legislators',
       'field' => 'lastname',
@@ -245,7 +250,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'name_suffix',
       'table' => 'cd_sunlight_legislators',
       'field' => 'name_suffix',
@@ -274,10 +279,38 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 0,
       'empty_zero' => 0,
-      'exclude' => 0,
+      'exclude' => 1,
       'id' => 'party',
       'table' => 'cd_sunlight_legislators',
       'field' => 'party',
+      'relationship' => 'none',
+    ),
+    'nothing' => array(
+      'label' => '',
+      'alter' => array(
+        'text' => '<div class="represenative-fullname">[title] [firstname] [middlename] [nickname] [lastname] [name_suffix] [party]</div>',
+        'make_link' => 0,
+        'path' => '',
+        'link_class' => '',
+        'alt' => '',
+        'prefix' => '',
+        'suffix' => '',
+        'target' => '',
+        'help' => '',
+        'trim' => 0,
+        'max_length' => '',
+        'word_boundary' => 1,
+        'ellipsis' => 1,
+        'html' => 0,
+        'strip_tags' => 0,
+      ),
+      'empty' => '',
+      'hide_empty' => 0,
+      'empty_zero' => 0,
+      'exclude' => 0,
+      'id' => 'nothing',
+      'table' => 'views',
+      'field' => 'nothing',
       'relationship' => 'none',
     ),
     'webform' => array(
@@ -303,7 +336,7 @@ function cd_sunlight_views_default_views() {
       'empty' => '',
       'hide_empty' => 1,
       'empty_zero' => 0,
-      'display_as_link' => 0,
+      'display_as_link' => 1,
       'display_as_favicon' => 0,
       'exclude' => 0,
       'id' => 'webform',
@@ -498,6 +531,38 @@ function cd_sunlight_views_default_views() {
       'id' => 'crp_id',
       'table' => 'cd_sunlight_legislators',
       'field' => 'crp_id',
+      'relationship' => 'none',
+    ),
+    'progressive_punch' => array(
+      'label' => '',
+      'alter' => array(
+        'alter_text' => 0,
+        'text' => '',
+        'make_link' => 0,
+        'path' => '',
+        'link_class' => '',
+        'alt' => '',
+        'prefix' => '',
+        'suffix' => '',
+        'target' => '',
+        'help' => '',
+        'trim' => 0,
+        'max_length' => '',
+        'word_boundary' => 1,
+        'ellipsis' => 1,
+        'html' => 0,
+        'strip_tags' => 0,
+      ),
+      'empty' => '',
+      'hide_empty' => 0,
+      'empty_zero' => 0,
+      'display_as_link' => 1,
+      'display_as_favicon' => 1,
+      'new_window' => 1,
+      'exclude' => 0,
+      'id' => 'progressive_punch',
+      'table' => 'cd_sunlight_legislators',
+      'field' => 'progressive_punch',
       'relationship' => 'none',
     ),
     'votesmart_id' => array(
@@ -790,7 +855,7 @@ function cd_sunlight_views_default_views() {
     'description' => '',
     'weight' => 0,
     'name' => 'navigation',
-));
+  ));
 
   $views[$view->name] = $view;
 
