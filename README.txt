@@ -6,9 +6,9 @@ $Id$
 * ABOUT *
 
 This module provides a way to automatically get congressional district information about your
-contacts into CiviCRM using the Sunlight API.
-  http://wiki.sunlightlabs.com/Sunlight_API_Documentation
-It also fetches data about the current members of congress.  You can access all this data via an
+contacts into CiviCRM using the Sunlight Congress API.
+  http://services.sunlightlabs.com/docs/Sunlight_Congress_API/
+It also fetches data about the current members of Congress.  You can access all this data via an
 API or use the Views module.
 
 
