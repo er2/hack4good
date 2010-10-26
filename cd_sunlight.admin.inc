@@ -227,15 +227,21 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
  *  FAPI array
  */
 function cd_sunlight_settings_fields_form() {
+  global $db_prefix;
 
   // Get options.
-  $resource = db_query('SELECT id, custom_group_id, label 
-    FROM {civicrm_custom_field}
-    WHERE data_type = "string"
-    ORDER BY custom_group_id, weight');
   $fields = array();
-  while ($field = db_fetch_array($resource)) {
-    $fields[$field['id']] = $field['custom_group_id'] .': '. check_plain($field['label']);
+  if (!isset($db_prefix['civicrm_custom_field'])) {
+    drupal_set_message(t('You must configure <a href="!url">table prefixes for CiviCRM tables</a> first.', array('!url' => url('admin/reports/status'))), 'error');
+  }
+  else {
+    $resource = db_query('SELECT id, custom_group_id, label
+      FROM {civicrm_custom_field}
+      WHERE data_type = "string"
+      ORDER BY custom_group_id, weight');
+    while ($field = db_fetch_array($resource)) {
+      $fields[$field['id']] = $field['custom_group_id'] .': '. check_plain($field['label']);
+    }
   }
 
   // Form.

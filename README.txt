@@ -3,7 +3,7 @@ $Id$
 *** CIVICRM SUNLIGHT CONGRESSIONAL DISTRICTS ***
 
 
-* ABOUT *
+** ABOUT **
 
 This module provides a way to automatically get congressional district information about your
 contacts into CiviCRM using the Sunlight Congress API.
@@ -12,7 +12,7 @@ It also fetches data about the current members of Congress.  You can access all 
 API or use the Views module.
 
 
-* INSTALL *
+** INSTALL **
 
 1)Unpack the modules files just like any other Drupal module.  Probably at something like:
     sites/all/modules/contrib/cd_sunlight
@@ -20,7 +20,7 @@ API or use the Views module.
 2)Navigate to
     /admin/reports/status
   To get instructions on how to configure your settings.php to use the module.  Specifically you
-  must have prefixes for several CiviCRM tables in settings.php.  Ignore other CD Sunlight errors
+  must have prefixes for several CiviCRM tables in settings.php.  
 
 3)Configure the module at
     /admin/settings/cd_sunlight
@@ -28,6 +28,7 @@ API or use the Views module.
 
 4)Link with CiviCRM fields at
     /admin/settings/cd_sunlight/fields
+  Follow the links to create new fields in CiviCRM.
 
 5)Return to the status report to see if the module is reporting any problems
     /admin/reports/status
@@ -43,7 +44,7 @@ API or use the Views module.
 
 
 
-* VIEWS INTEGRATION *
+** VIEWS INTEGRATION **
 
 To show information about members of Congress on your site you need to install the Views module.
   http://drupal.org/project/views
@@ -52,7 +53,7 @@ You can find the default view called "Congress" at
 You can either customize it or create a new view of the type "Congress".
 
 
-* USING THE API *
+** USING THE API **
 
 The API should only be used in situations where Views cannot be used.  In the future the Views 
 integration will likely see more tending than the API.  Here are the API functions.  See the
@@ -78,20 +79,20 @@ cd_sunlight_state_abbr2name($state_abbr);
 cd_sunlight_state_name2abbr($state_name);
 
 
-* CONGRESS MODULE *
+** CONGRESS MODULE **
 
 DEPRICATED.  The congress module is an example implementation of the API.  New users should use
 Views instead.  It will be removed in cd_sunlight 3.x or Drupal 7 (whichever comes first) existing
 users should replace with Views before then.
 
 
-* DEVELOPED BY *
+** DEVELOPED BY **
 
 Advomatic LLC
 http://advomatic.com
 
 
-* SPONSORED BY *
+** SPONSORED BY **
 
 Democrats.com
 http://democrats.com

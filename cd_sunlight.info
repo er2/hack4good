@@ -2,5 +2,6 @@
 name = CiviCRM Congressional District
 description = Integrates with the Sunlight service to lookup congressional districts when a CiviCRM contact changes.  Also shows lists of members of Congress.
 dependencies[] = civicrm
+dependencies[] = views
 core = 6.x
 php = 5.0

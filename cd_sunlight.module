@@ -150,12 +150,10 @@ function cd_sunlight_cron() {
   $has_been_populated = _cd_sunlight_legislators_exist();
   if (!$has_been_populated || $last_run < $day_ago) {
     _cd_sunlight_congress_update_all();
-    variable_set('cd_sunlight_last_process_new_regions', $time);
   }
 
   // Cleanup old values from the cron table.
-  $max = db_result(
-    db_query('SELECT MAX(cd_sunlight_cron_id) FROM {cd_sunlight_cron} WHERE processed = 1'));
+  $max = db_result(db_query('SELECT MAX(cd_sunlight_cron_id) FROM {cd_sunlight_cron} WHERE processed = 1'));
   db_query('DELETE FROM {cd_sunlight_cron} WHERE cd_sunlight_cron_id <= %d AND processed = 1',
     $max - variable_get('dblog_row_limit', 1000));
 
@@ -1220,8 +1218,15 @@ function _cd_sunlight_legislator_filter_fields($legislator) {
  */
 function _cd_sunlight_uid_get_contact_id($uid) {
   civicrm_initialize();
-  require_once('api/UFGroup.php');
-  if (!($contact_id = crm_uf_get_match_id($uid))) {
+  if (file_exists('api/UFGroup.php')) {
+    include_once('api/UFGroup.php');
+    $contact_id = crm_uf_get_match_id($uid);
+  }
+  elseif (file_exists('api/v2/UFGroup.php')) {
+    include_once('api/v2/UFGroup.php');
+    $contact_id = civicrm_uf_match_id_get($uid);
+  }
+  if (empty($contact_id)) {
     watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a contact_id for uid @uid <pre>@trace</trace>',
       array('@uid' => $uid, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_WARNING
     );
@@ -1239,66 +1244,23 @@ function _cd_sunlight_uid_get_contact_id($uid) {
  */
 function _cd_sunlight_contact_id_get_uid($contact_id) {
   civicrm_initialize();
-  require_once('api/UFGroup.php');
-  return crm_uf_get_uf_id($contact_id);
+  if (file_exists('api/UFGroup.php')) {
+    include_once('api/UFGroup.php');
+    $uid = crm_uf_get_uf_id($contact_id);
+  }
+  elseif (file_exists('api/v2/UFGroup.php')) {
+    include_once('api/v2/UFGroup.php');
+    $uid = civicrm_uf_id_get($contact_id);
+  }
+  if (empty($contact_id)) {
+    watchdog('cd_sunlight', 'CiviCRM API error.  Could not find a uid for contact @contact_id <pre>@trace</trace>',
+      array('@contact_id' => $contact_id, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_WARNING
+    );
+    return NULL;
+  }
+  return $uid;
 }
 
-
-/**
- * Update all members of congress that match a set of search parameters.
- *
- * Note that we only care about legislators currently in office, not dead/defeated/retired ones.
- *
- * @param $params
- *  Search parameters.
- *  @see _cd_sunlight_legislators_apilookup()
- * @return boolean
- *  TRUE on success, else FALSE.
- */
-function _cd_sunlight_congress_update_params($params) {
-  $query = drupal_query_string_encode($params);
-  $legislators = _cd_sunlight_legislators_apilookup($params);
-  if ($legislators === FALSE) {
-    watchdog('cd_sunlight', 'Could not lookup legislators for %query',
-      array('%query' => $query), WATCHDOG_ERROR);
-    return FALSE;
-  }
-  if (empty($legislators)) {
-    watchdog('cd_sunlight', 'There are currently no legislators for %query',
-      array('%query' => $query), WATCHDOG_NOTICE);
-  }
-
-  // Because we only care about current legislators, delete any previous matching records.
-  _cd_sunlight_legislator_delete($params);
-
-  if (empty($legislators)) {
-    return FALSE;
-  }
-
-  // Save our new legislators.
-  $error = FALSE;
-  foreach ($legislators as $legislator) {
-    if (!_cd_sunlight_legislator_save($legislator)) {
-      $error = TRUE;
-    }
-  }
-
-  // Return something.
-  if ($error) {
-    watchdog('cd_sunlight', 'Could not save new legislator data for %query',
-      array('%query' => $query), WATCHDOG_ERROR);
-    return FALSE;
-  }
-  else {
-    watchdog('cd_sunlight', "Updated data for @count @param.",
-      array(
-        '@count' => count($legislators),
-        '@param' => (isset($params['title']) ? $params['title'] .'s' : t('non-voting state'))
-      ), WATCHDOG_INFO);
-
-  }
-  return TRUE;
-}
 
 /**
  * Query the Sunlight API service and retrieve legislators that match the given parameters.
@@ -1708,41 +1670,57 @@ function _cd_sunlight_api_lookup($method, $params, &$error_message = '') {
 /**
  * Update the info for all legislators.
  *
- * Cron calls this, perhaps nightly.  This should take 5-30 seconds to complete.
+ * Cron calls this, perhaps nightly.  This should take < 10 seconds to complete.
  *
- * @return none
+ * @return boolean
+ *  TRUE on success, else FALSE.
  */
 function _cd_sunlight_congress_update_all() {
   watchdog('cd_sunlight', 'Updating all members of congress', array(), WATCHDOG_INFO);
 
   // Update all Senators.
   $params = array(
-    'title' => 'Sen',
+    'in_office' => TRUE,
   );
-  _cd_sunlight_congress_update_params($params);
-
-  // Give things a chance to catch up, don't clobber Sunlight.
-  _cd_sunlight_sleep();
-
-  // Update all Representatives.
-  $params = array(
-    'title' => 'Rep',
-  );
-  _cd_sunlight_congress_update_params($params);
-
-  // Give things a chance to catch up, don't clobber Sunlight.
-  _cd_sunlight_sleep();
-
-  // Update all Non-voting states.
-  $states = _cd_sunlight_state_list_with_non_voting_congresspersons();
-  foreach ($states as $state) {
-    $params = array(
-      'state' => $state,
-    );
-    _cd_sunlight_congress_update_params($params);
-    _cd_sunlight_sleep();
+  $query = drupal_query_string_encode($params);
+  $legislators = _cd_sunlight_legislators_apilookup($params);
+  if ($legislators === FALSE) {
+    watchdog('cd_sunlight', 'Could not lookup legislators for %query',
+      array('%query' => $query), WATCHDOG_ERROR);
+    return FALSE;
+  }
+  if (empty($legislators)) {
+    watchdog('cd_sunlight', 'There are currently no legislators for %query',
+      array('%query' => $query), WATCHDOG_NOTICE);
   }
 
+  // Because we only care about current legislators, delete any previous matching records.
+  _cd_sunlight_legislator_delete($params);
+
+  if (empty($legislators)) {
+    return FALSE;
+  }
+
+  // Save our new legislators.
+  $error = FALSE;
+  foreach ($legislators as $legislator) {
+    if (!_cd_sunlight_legislator_save($legislator)) {
+      $error = TRUE;
+    }
+  }
+
+  // Return something.
+  if ($error) {
+    watchdog('cd_sunlight', 'Could not save new legislator data for %query',
+      array('%query' => $query), WATCHDOG_ERROR);
+    return FALSE;
+  }
+  else {
+    watchdog('cd_sunlight', "Updated data for @count in office members of Congress.",
+      array('@count' => count($legislators)), WATCHDOG_INFO);
+    variable_set('cd_sunlight_last_process_new_regions', $_SERVER['REQUEST_TIME']);
+    return TRUE;
+  }
 }
 
 /**
@@ -2183,15 +2161,20 @@ function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
   global $db_url;
 
   // Set in Drupal.
-  $old_db = db_set_active();
+  if (is_array($db_url)) {
+    $old_db = db_set_active();
 
-  foreach ($db_url as $db_name => $connection_string) {
-    db_set_active($db_name);
-    db_query('SET SESSION wait_timeout = %d', $timeout);
+    foreach ($db_url as $db_name => $connection_string) {
+      db_set_active($db_name);
+      db_query('SET SESSION wait_timeout = %d', $timeout);
+    }
+
+    if ($old_db && $old_db != $db_name) {
+      db_set_active($old_db);
+    }
   }
-
-  if ($old_db && $old_db != $db_name) {
-    db_set_active($old_db);
+  else {
+    db_query('SET SESSION wait_timeout = %d', $timeout);
   }
 
   // Set in CiviCRM.
