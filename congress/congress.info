@@ -1,5 +1,0 @@
-; $Id$ 
-name = Congress
-description = Shows the current members of congress. DEPRICATED - USE VIEWS INSTEAD.
-core = 6.x
-dependencies[] = cd_sunlight
