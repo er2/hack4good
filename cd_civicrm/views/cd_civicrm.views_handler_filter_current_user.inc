@@ -3,7 +3,7 @@
 
 /**
  * @file
- * Views handlers for cd_sunlight.
+ * Views handlers for cd_civicrm.
  * 
  * @todo Change the block/page title appropriately.
  */
@@ -45,7 +45,9 @@ class views_handler_filter_district_current_user extends views_handler_filter {
 
   function value_form(&$form, &$form_state) { }
 
-  function can_expose() { return FALSE; }
+  function can_expose() { 
+    return FALSE;
+  }
 
   function query() {
     $this->ensure_my_table();

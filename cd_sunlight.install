@@ -19,8 +19,15 @@ function cd_sunlight_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
+      'storage_system' => array(
+        'description' => t('Contact storage system.'),
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'contact_id' => array(
-        'description' => t('CiviCRM Contact ID.'),
+        'description' => t('Contact ID.'),
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -253,47 +260,8 @@ function cd_sunlight_requirements($phase) {
   $requirements = array();
   if ($phase == 'runtime') {
 
-    // Raise an error if we do not have prefixes for all the CiviCRM tables.
-    $civicrm_tables = array('civicrm_custom_field', 'civicrm_contact', 'civicrm_address',
-      'civicrm_custom_group', 'civicrm_uf_match', variable_get('cd_sunlight_civicrm_custom_table', ''));
-    $error_tables = array();
-    foreach ($civicrm_tables as $table) {
-      if ($table && !isset($db_prefix[$table])) {
-        $error_tables[] = $table;
-      }
-    }
-    $requirements['cd_sunlight_db'] = array(
-      'title' => 'CD Sunlight',
-      'description' => t('In %settings $db_prefix must be an array and you must have prefixes '.
-        'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a> '.
-        'for more info.',
-        array(
-          '%tables' => implode(', ', $civicrm_tables),
-          '!url' => url('civicrm/admin/setting/uf'),
-          '%settings' => conf_path() .'/settings.php',
-        )),
-      'severity' => $error_tables ? REQUIREMENT_ERROR : REQUIREMENT_OK,
-      'value' => t('settings.php DB Prefix'),
-    );
-    if ($error_tables) {
-      $requirements['cd_sunlight_db']['description'] .= t(
-              'Prefixes do not exist for the following tables: %tables.', array(
-                '%tables' => implode(', ', $error_tables)
-              ));
-    }
-
-    // If we already have an error, don't bother continuing, it will only confuse the admin.
-    // They need to get the above sorted out before they can do anything. 
-    if ($error_tables) {
-      return $requirements;
-    }
-
     // Raise an error if a the module has not been setup.
-    if (
-      !variable_get('cd_sunlight_api_key', '') ||
-      !variable_get('cd_sunlight_civicrm_cd', '') ||
-      !variable_get('cd_sunlight_civicrm_cd_override', '')
-    ) {
+    if (!variable_get('cd_sunlight_api_key', '')) {
       $requirements['cd_sunlight_setup'] = array(
         'title' => 'CiviCRM Sunlight Congressional District',
         'description' => t('You have not <a href="!url">configured</a> the module.'
@@ -379,6 +347,9 @@ function cd_sunlight_uninstall() {
   variable_del('cd_sunlight_api_key');
   variable_del('cd_sunlight_cron_contact_limit');
   variable_del('cd_sunlight_total_lookups');
+  variable_del('cd_sunlight_civicrm_cd');
+  variable_del('cd_sunlight_civicrm_cd_override');
+  variable_del('cd_sunlight_crypt_iv');
 }
 
 /**
@@ -482,5 +453,62 @@ function cd_sunlight_update_6002() {
     'not null' => FALSE,
   );
   db_add_field($return, 'cd_sunlight_legislators', 'birthdate', $birthdate);
+  return $return;
+}
+
+/**
+ * Upgrade path for splitting the module.
+ */
+function cd_sunlight_update_6003() {
+  $return = array();
+
+  // Enable module.
+  module_rebuild_cache();
+  drupal_install_modules(array('cd_civicrm'));
+  $return[] = array('success' => TRUE, 'query' => 'Enabled CD CiviCRM module.');
+
+  // Add new field.
+  $storage_system = array(
+    'description' => t('Contact storage system.'),
+    'type' => 'varchar',
+    'length' => 64,
+    'not null' => TRUE,
+    'default' => '',
+  );
+  db_add_field($return, 'cd_sunlight_cron', 'storage_system', $storage_system);
+
+  // Variables.
+  variable_set('cd_civicrm_cd', variable_get('cd_sunlight_civicrm_cd', ''));
+  variable_set('cd_civicrm_cd_override', variable_get('cd_sunlight_civicrm_cd_override', ''));
+  variable_set('cd_civicrm_geocoding_off', variable_get('cd_sunlight_geocoding_off', ''));
+  variable_set('cd_civicrm_geocode_username', variable_get('cd_sunlight_geocode_username', ''));
+  variable_set('cd_civicrm_crypt_iv', variable_get('cd_sunlight_crypt_iv', ''));
+  variable_del('cd_sunlight_civicrm_cd');
+  variable_del('cd_sunlight_civicrm_cd_override');
+  variable_del('cd_sunlight_geocoding_off');
+  variable_del('cd_civicrm_geocode_username');
+  variable_del('cd_sunlight_crypt_iv');
+
+  // Check for batch geocoding.
+  if (defined('CD_SUNLIGHT_GEOCODE_PASSWORD')) {
+    $return[] = array(
+      'success' => FALSE,
+      'query' => 'The CD_SUNLIGHT_GEOCODE_PASSWORD in settings.php must be renamed to CD_CIVICRM_GEOCODE_PASSWORD.'
+    );
+  }
+
+  // Check for geocoding user.
+  if (variable_get('cd_civicrm_geocode_username', '')) {
+    $return[] = array(
+      'success' => FALSE,
+      'query' => 'You must re set the geocode username as the encryption logic has changed.'
+    );
+  }
+
+
+
+  cache_clear_all('*', 'cache', TRUE);
+  cache_clear_all('*', 'cache_menu', TRUE);
+
   return $return;
 }

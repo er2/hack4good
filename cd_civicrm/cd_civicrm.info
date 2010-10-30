@@ -1,0 +1,7 @@
+; $Id$
+name = CiviCRM Congressional District
+description = Stores congressional district information when a CiviCRM contact changes.
+dependencies[] = civicrm
+dependencies[] = cd_sunlight
+core = 6.x
+php = 5.0

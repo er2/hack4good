@@ -299,16 +299,6 @@ function cd_sunlight_views_handlers() {
         'file' => 'cd_sunlight.views_handler_field_congress_picture.inc',
         'path' => $path,
       ),
-      'views_handler_filter_state_current_user' => array(
-        'parent' => 'views_handler_filter_boolean_operator',
-        'file' => 'cd_sunlight.views_handler_filter_current_user.inc',
-        'path' => $path,
-      ),
-      'views_handler_filter_district_current_user' => array(
-        'parent' => 'views_handler_filter_boolean_operator',
-        'file' => 'cd_sunlight.views_handler_filter_current_user.inc',
-        'path' => $path,
-      ),
       'views_handler_field_chamber' => array(
         'parent' => 'views_handler_field',
         'file' => 'cd_sunlight.views_handler_field_chamber.inc',
@@ -377,24 +367,3 @@ function cd_sunlight_views_handlers() {
     ),
   );
 }
-
-/**
- * Implementation of hook_views_query_substitutions().
- */
-function cd_sunlight_views_query_substitutions($view) {
-  global $user;
-  $substitutions = array();
-  if ($view->base_table == 'cd_sunlight_legislators') {
-    $substitutions['***CURRENT_USERS_STATE***'] = 'NULL';
-    $substitutions['***CURRENT_USERS_DISTRICT***'] = 'NULL';
-    if ($user->uid) {
-      $cd = cd_sunlight_user_get_cd($user->uid);
-      if ($cd && $cd != 'not found') {
-        $substitutions['***CURRENT_USERS_STATE***'] = "'". cd_sunlight_cd_parse_state($cd) ."'";
-        $substitutions['***CURRENT_USERS_DISTRICT***'] = intval(cd_sunlight_cd_parse_district($cd));
-      }
-    }
-  }
-  return $substitutions;
-}
-

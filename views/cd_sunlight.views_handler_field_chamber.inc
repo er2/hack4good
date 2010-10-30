@@ -7,7 +7,7 @@
  */
 
 /**
- * Field handler to fetch the congress member's photo from Bioguide.
+ * Field handler to expand the chamber abbreviations.
  *
  * @ingroup views_field_handlers
  */
