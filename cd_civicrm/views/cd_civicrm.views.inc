@@ -15,7 +15,7 @@ function cd_civicrm_views_data_alter(&$data) {
     'title' => t("Current User's State"),
     'help' => t('Filter the view to the State of the currently logged in user.'),
     'filter' => array(
-      'handler' => 'views_handler_filter_state_current_user',
+      'handler' => 'cd_civicrm_handler_filter_state_current_user',
       'type' => 'yes-no',
     ),
   );
@@ -26,10 +26,11 @@ function cd_civicrm_views_data_alter(&$data) {
               Only useful when used with the %current_state filter.',
               array('%current_state' => t("Current User's State"))),
     'filter' => array(
-      'handler' => 'views_handler_filter_district_current_user',
+      'handler' => 'cd_civicrm_handler_filter_district_current_user',
       'type' => NULL,
     ),
   );
+  $data['cd_sunlight_legislators']['state']['filter']['handler'] = 'cd_civicrm_handler_filter_state';
 }
 
 /**
@@ -38,97 +39,37 @@ function cd_civicrm_views_data_alter(&$data) {
 function cd_civicrm_views_default_views_alter(&$views) {
   if (isset($views['Congress'])) {
     $view =& $views['Congress'];
+    /* Display: Block - Current user */
     $handler = $view->new_display('block', 'Block - Current user', 'block_3');
-    $handler->override_option('filters', array(
-      'district_current' => array(
-        'operator' => '=',
-        'value' => '1',
-        'group' => '0',
-        'exposed' => FALSE,
-        'expose' => array(
-          'operator' => FALSE,
-          'label' => '',
-        ),
-        'id' => 'district_current',
-        'table' => 'cd_sunlight_legislators',
-        'field' => 'district_current',
-        'override' => array(
-          'button' => 'Use default',
-        ),
-        'relationship' => 'none',
-      ),
-      'state_current' => array(
-        'operator' => '=',
-        'value' => '1',
-        'group' => '0',
-        'exposed' => FALSE,
-        'expose' => array(
-          'operator' => FALSE,
-          'label' => '',
-        ),
-        'id' => 'state_current',
-        'table' => 'cd_sunlight_legislators',
-        'field' => 'state_current',
-        'override' => array(
-          'button' => 'Use default',
-        ),
-        'relationship' => 'none',
-      ),
-    ));
-    $handler->override_option('block_description', '');
-    $handler->override_option('block_caching', -1);
+    $handler->display->display_options['defaults']['filters'] = FALSE;
+    /* Filter: Congress: Current User's District */
+    $handler->display->display_options['filters']['district_current']['id'] = 'district_current';
+    $handler->display->display_options['filters']['district_current']['table'] = 'cd_sunlight_legislators';
+    $handler->display->display_options['filters']['district_current']['field'] = 'district_current';
+    $handler->display->display_options['filters']['district_current']['value'] = '1';
+    $handler->display->display_options['filters']['district_current']['expose']['operator'] = FALSE;
+    /* Filter: Congress: Current User's State */
+    $handler->display->display_options['filters']['state_current']['id'] = 'state_current';
+    $handler->display->display_options['filters']['state_current']['table'] = 'cd_sunlight_legislators';
+    $handler->display->display_options['filters']['state_current']['field'] = 'state_current';
+    $handler->display->display_options['filters']['state_current']['value'] = '1';
+    $handler->display->display_options['filters']['state_current']['expose']['operator'] = FALSE;
+
+    /* Display: Page - Current user */
     $handler = $view->new_display('page', 'Page - Current user', 'page_2');
-    $handler->override_option('filters', array(
-      'district_current' => array(
-        'operator' => '=',
-        'value' => '',
-        'group' => '0',
-        'exposed' => FALSE,
-        'expose' => array(
-          'operator' => FALSE,
-          'label' => '',
-        ),
-        'id' => 'district_current',
-        'table' => 'cd_sunlight_legislators',
-        'field' => 'district_current',
-        'override' => array(
-          'button' => 'Use default',
-        ),
-        'relationship' => 'none',
-      ),
-      'state_current' => array(
-        'operator' => '=',
-        'value' => '1',
-        'group' => '0',
-        'exposed' => FALSE,
-        'expose' => array(
-          'operator' => FALSE,
-          'label' => '',
-        ),
-        'id' => 'state_current',
-        'table' => 'cd_sunlight_legislators',
-        'field' => 'state_current',
-        'override' => array(
-          'button' => 'Use default',
-        ),
-        'relationship' => 'none',
-      ),
-    ));
-    $handler->override_option('path', 'my-congress');
-    $handler->override_option('menu', array(
-      'type' => 'none',
-      'title' => '',
-      'description' => '',
-      'weight' => 0,
-      'name' => 'navigation',
-    ));
-    $handler->override_option('tab_options', array(
-      'type' => 'none',
-      'title' => '',
-      'description' => '',
-      'weight' => 0,
-      'name' => 'navigation',
-    ));
+    $handler->display->display_options['defaults']['filters'] = FALSE;
+    /* Filter: Congress: Current User's District */
+    $handler->display->display_options['filters']['district_current']['id'] = 'district_current';
+    $handler->display->display_options['filters']['district_current']['table'] = 'cd_sunlight_legislators';
+    $handler->display->display_options['filters']['district_current']['field'] = 'district_current';
+    $handler->display->display_options['filters']['district_current']['expose']['operator'] = FALSE;
+    /* Filter: Congress: Current User's State */
+    $handler->display->display_options['filters']['state_current']['id'] = 'state_current';
+    $handler->display->display_options['filters']['state_current']['table'] = 'cd_sunlight_legislators';
+    $handler->display->display_options['filters']['state_current']['field'] = 'state_current';
+    $handler->display->display_options['filters']['state_current']['value'] = '1';
+    $handler->display->display_options['filters']['state_current']['expose']['operator'] = FALSE;
+    $handler->display->display_options['path'] = 'my-congress';
   }
 }
 
@@ -136,18 +77,21 @@ function cd_civicrm_views_default_views_alter(&$views) {
  * Implementation of hook_views_handlers().
  */
 function cd_civicrm_views_handlers() {
-  $path = drupal_get_path('module', 'cd_civicrm') .'/views';
   return array(
+    'info' => array(
+      'path' => drupal_get_path('module', 'cd_civicrm') .'/views',
+    ),
     'handlers' => array(
-      'views_handler_filter_state_current_user' => array(
+      'cd_civicrm_handler_filter_state_current_user' => array(
         'parent' => 'views_handler_filter_boolean_operator',
-        'file' => 'cd_civicrm.views_handler_filter_current_user.inc',
-        'path' => $path,
+        'file' => 'cd_civicrm_handler_filter_current_user.inc',
       ),
-      'views_handler_filter_district_current_user' => array(
+      'cd_civicrm_handler_filter_district_current_user' => array(
         'parent' => 'views_handler_filter_boolean_operator',
-        'file' => 'cd_civicrm.views_handler_filter_current_user.inc',
-        'path' => $path,
+        'file' => 'cd_civicrm_handler_filter_current_user.inc',
+      ),
+      'cd_civicrm_handler_filter_state' => array(
+        'parent' => 'cd_sunlight_handler_filter_state',
       ),
     ),
   );

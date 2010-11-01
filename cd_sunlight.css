@@ -1,0 +1,18 @@
+/*
+ * @file
+ * Styles for Congress view.
+ */
+
+.view-Congress .views-field-picture {
+   float: left;
+   margin: 0 1em 1em;
+}
+
+.view-Congress li, .view-Congress .item-list {
+  clear: both;
+}
+
+.view-Congress .item-list ul li {
+  list-style: none;
+  background: none;
+}

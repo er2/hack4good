@@ -34,6 +34,8 @@ This module
 4)Visit the status report to see if the module is reporting any problems.
     /admin/reports/status
 
+5)Proceed to the cd_civicrm/README.txt if you wish to integrate with CiviCRM.
+
 
 
 ** VIEWS INTEGRATION **

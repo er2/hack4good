@@ -245,6 +245,7 @@ function cd_sunlight_schema() {
       'cd_sunlight_legislators_party_idx' => array('party'),
       'cd_sunlight_legislators_state_district_idx' => array('state', 'district'),
       'cd_sunlight_legislators_title_idx' => array('title'),
+      'cd_sunlight_legislators_gender_idx' => array('gender'),
     ),
   );
 
@@ -505,9 +506,8 @@ function cd_sunlight_update_6003() {
     );
   }
 
-
-
   cache_clear_all('*', 'cache', TRUE);
+  cache_clear_all('*', 'cache_views', TRUE);
   cache_clear_all('*', 'cache_menu', TRUE);
 
   return $return;

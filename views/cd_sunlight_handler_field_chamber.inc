@@ -2,16 +2,11 @@
 // $Id$
 
 /**
- * @file
- * Views handlers for cd_sunlight.
- */
-
-/**
  * Field handler to expand the chamber abbreviations.
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_chamber extends views_handler_field {
+class cd_sunlight_handler_field_chamber extends views_handler_field {
 
   /**
    * Add all the fields that we need.

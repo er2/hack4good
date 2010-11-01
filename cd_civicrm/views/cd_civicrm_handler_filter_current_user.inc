@@ -13,7 +13,7 @@
  *
  * @ingroup views_field_handlers
  */
-class views_handler_filter_state_current_user extends views_handler_filter_boolean_operator {
+class cd_civicrm_handler_filter_state_current_user extends views_handler_filter_boolean_operator {
   function construct() {
     parent::construct();
     $this->value_value = t("Is the logged in user's state");
@@ -41,7 +41,7 @@ class views_handler_filter_state_current_user extends views_handler_filter_boole
  *
  * @ingroup views_field_handlers
  */
-class views_handler_filter_district_current_user extends views_handler_filter {
+class cd_civicrm_handler_filter_district_current_user extends views_handler_filter {
 
   function value_form(&$form, &$form_state) { }
 

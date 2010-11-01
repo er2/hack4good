@@ -17,11 +17,11 @@
  *  $this->url_path
  *  $this->url_query
  *
- * @see views_handler_field_url_favicon_youtube()
+ * @see cd_sunlight_handler_field_url_favicon_youtube()
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon extends views_handler_field_url {
+class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
   
   protected $favicon_url;
   protected $human_readable;
@@ -92,7 +92,7 @@ class views_handler_field_url_favicon extends views_handler_field_url {
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_youtube extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_youtube extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://www.youtube.com/favicon.ico';
@@ -109,7 +109,7 @@ class views_handler_field_url_favicon_youtube extends views_handler_field_url_fa
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_bioguide extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_bioguide extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://bioguide.congress.gov/favicon.ico';
@@ -126,7 +126,7 @@ class views_handler_field_url_favicon_bioguide extends views_handler_field_url_f
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_votesmart extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_votesmart extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://votesmart.org/favicon.ico';
@@ -143,7 +143,7 @@ class views_handler_field_url_favicon_votesmart extends views_handler_field_url_
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_govtrack extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_govtrack extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://www.govtrack.us/favicon.ico';
@@ -160,7 +160,7 @@ class views_handler_field_url_favicon_govtrack extends views_handler_field_url_f
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_opensecrets extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_opensecrets extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://www.opensecrets.org/img/favicon.ico';
@@ -177,7 +177,7 @@ class views_handler_field_url_favicon_opensecrets extends views_handler_field_ur
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_congresspedia extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_congresspedia extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://www.opencongress.org/favicon.ico';
@@ -194,7 +194,7 @@ class views_handler_field_url_favicon_congresspedia extends views_handler_field_
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_twitter extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_twitter extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     $this->favicon_url = 'http://twitter.com/favicon.ico';
@@ -211,7 +211,7 @@ class views_handler_field_url_favicon_twitter extends views_handler_field_url_fa
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_progressive_punch extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_progressive_punch extends cd_sunlight_handler_field_url_favicon {
 
   /**
    * Add all the fields that we need.
@@ -260,7 +260,7 @@ class views_handler_field_url_favicon_progressive_punch extends views_handler_fi
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_generic extends views_handler_field_url_favicon {
+class cd_sunlight_handler_field_url_favicon_generic extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
     if (empty($this->human_readable)) {
@@ -294,7 +294,7 @@ class views_handler_field_url_favicon_generic extends views_handler_field_url_fa
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_webform extends views_handler_field_url_favicon_generic {
+class cd_sunlight_handler_field_url_favicon_webform extends cd_sunlight_handler_field_url_favicon_generic {
 
   function render($values) {
     $this->human_readable = 'Contact form';
@@ -308,7 +308,7 @@ class views_handler_field_url_favicon_webform extends views_handler_field_url_fa
  *
  * @ingroup views_field_handlers
  */
-class views_handler_field_url_favicon_website extends views_handler_field_url_favicon_generic {
+class cd_sunlight_handler_field_url_favicon_website extends cd_sunlight_handler_field_url_favicon_generic {
 
   function render($values) {
     $this->human_readable = 'Website';
