@@ -58,6 +58,7 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
     if (empty($values->{$this->field_alias})) {
       return NULL;
     }
+
     if (!empty($this->options['display_as_favicon']) && !empty($this->favicon_url)) {
 
       // Resolve favicons.
@@ -67,21 +68,23 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
       }
 
     }
+    $class = str_replace('_', '-', $this->field_alias);
     if (!empty($this->options['display_as_link'])) {
       if (empty($value)) {
         $value = check_plain($this->human_readable);
       }
       $l_options = array('html' => TRUE, 'query' => $this->url_query);
+      $l_options['attributes']['class'] = $class;
       if (empty($this->options['display_as_favicon'])) {
         $l_options['attributes']['title'] = $this->human_readable;
       }
       if (!empty($this->options['new_window'])) {
         $l_options['attributes']['target'] = '_blank';
       }
-      return l($value, $this->url_path, $l_options);
+      return l('<span>'. $value .'</span>', $this->url_path, $l_options);
     }
     else {
-      return check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query);
+      return '<span class="'. $class .'">'. check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query) .'</span>';
     }
   }
 

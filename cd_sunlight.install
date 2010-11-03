@@ -481,11 +481,17 @@ function cd_sunlight_update_6003() {
   // Variables.
   variable_set('cd_civicrm_cd', variable_get('cd_sunlight_civicrm_cd', ''));
   variable_set('cd_civicrm_cd_override', variable_get('cd_sunlight_civicrm_cd_override', ''));
+  variable_set('cd_civicrm_custom_field_cd', variable_get('cd_sunlight_civicrm_custom_field_cd', ''));
+  variable_set('cd_civicrm_custom_field_cd_override', variable_get('cd_sunlight_civicrm_custom_field_cd_override', ''));
+  variable_set('cd_civicrm_custom_table', variable_get('cd_sunlight_civicrm_custom_table', ''));
   variable_set('cd_civicrm_geocoding_off', variable_get('cd_sunlight_geocoding_off', ''));
   variable_set('cd_civicrm_geocode_username', variable_get('cd_sunlight_geocode_username', ''));
   variable_set('cd_civicrm_crypt_iv', variable_get('cd_sunlight_crypt_iv', ''));
   variable_del('cd_sunlight_civicrm_cd');
   variable_del('cd_sunlight_civicrm_cd_override');
+  variable_del('cd_sunlight_civicrm_custom_field_cd');
+  variable_del('cd_sunlight_civicrm_custom_field_cd_override');
+  variable_del('cd_sunlight_civicrm_custom_table');
   variable_del('cd_sunlight_geocoding_off');
   variable_del('cd_civicrm_geocode_username');
   variable_del('cd_sunlight_crypt_iv');

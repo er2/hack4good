@@ -803,12 +803,10 @@ function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
   // Set in Drupal.
   if (is_array($db_url)) {
     $old_db = db_set_active();
-
     foreach ($db_url as $db_name => $connection_string) {
       db_set_active($db_name);
       db_query('SET SESSION wait_timeout = %d', $timeout);
     }
-
     if ($old_db && $old_db != $db_name) {
       db_set_active($old_db);
     }
@@ -883,15 +881,30 @@ function _cd_sunlight_is_url_an_image($url) {
 
   // Shorten the default timeout - we don't want the page to hang because we're waiting on favicons.
   $response = drupal_http_request($url, array(), 'GET', NULL, 2, 4);
-  if (
-    $response->code == 200 || $response->code == 301 &&
-    isset($response->headers['Content-Type']) &&
-    strpos(strtolower($response->headers['Content-Type']), 'image') !== FALSE &&
-    !empty($response->data)
-  ) {
-    return $response->data;
+
+  // Is it a valid response?
+  if ($response->code != 200 && $response->code != 301 || empty($response->data)) {
+    return FALSE;
   }
-  return FALSE;
+
+  // Normalize case of headers.
+  $headers = array();
+  foreach ($response->headers as $header => $header_value) {
+    $headers[drupal_strtolower($header)] = drupal_strtolower($header_value);
+  }
+
+  // Is it an image?
+  if (!isset($headers['content-type'])) {
+    return FALSE;
+  }
+  if (
+    strpos($headers['content-type'], 'image') !== FALSE &&
+    strpos($headers['content-type'], 'application/octet-stream') !== FALSE
+  ) {
+    return FALSE;
+  }
+
+  return $response->data;
 }
 
 /**
