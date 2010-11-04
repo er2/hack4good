@@ -55,7 +55,7 @@ function cd_sunlight_views_data() {
     'title' => t('Title'),
     'help' => t('Usually "Sen" or "Rep".'),
     'field' => array(
-      'handler' => 'views_handler_field',
+      'handler' => 'cd_sunlight_handler_field_title',
       'click sortable' => TRUE,
     ),
     'argument' => array(
@@ -81,7 +81,7 @@ function cd_sunlight_views_data() {
   $data['cd_sunlight_legislators']['party'] = array(
     'title' => t('Party'),
     'field' => array(
-      'handler' => 'views_handler_field',
+      'handler' => 'cd_sunlight_handler_field_party',
       'click sortable' => TRUE,
     ),
     'argument' => array(
@@ -119,11 +119,11 @@ function cd_sunlight_views_data() {
       'click sortable' => TRUE,
     ),
     'argument' => array(
-      'handler' => 'views_handler_argument_numeric',
+      'handler' => 'cd_sunlight_handler_argument_district',
       'numeric' => TRUE,
     ),
     'filter' => array(
-      'handler' => 'views_handler_filter_numeric',
+      'handler' => 'cd_sunlight_handler_filter_district',
     ),
     'sort' => array(
       'handler' => 'views_handler_sort',
@@ -279,10 +279,16 @@ function cd_sunlight_views_handlers() {
       'cd_sunlight_handler_field_congress_picture' => array(
         'parent' => 'views_handler_field',
       ),
+      'cd_sunlight_handler_field_title' => array(
+        'parent' => 'views_handler_field',
+      ),
       'cd_sunlight_handler_field_chamber' => array(
         'parent' => 'views_handler_field',
       ),
       'cd_sunlight_handler_field_nickname' => array(
+        'parent' => 'views_handler_field',
+      ),
+      'cd_sunlight_handler_field_party' => array(
         'parent' => 'views_handler_field',
       ),
 
@@ -349,6 +355,15 @@ function cd_sunlight_views_handlers() {
       'cd_sunlight_handler_filter_state' => array(
         'parent' => 'views_handler_filter_many_to_one',
       ),
+      'cd_sunlight_handler_filter_district' => array(
+        'parent' => 'views_handler_filter_many_to_one',
+      ),
+
+      // Arguments.
+      'cd_sunlight_handler_argument_district' => array(
+        'parent' => 'views_handler_argument_numeric',
+      ),
+
     ),
   );
 }

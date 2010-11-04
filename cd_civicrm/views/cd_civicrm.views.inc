@@ -31,6 +31,7 @@ function cd_civicrm_views_data_alter(&$data) {
     ),
   );
   $data['cd_sunlight_legislators']['state']['filter']['handler'] = 'cd_civicrm_handler_filter_state';
+  $data['cd_sunlight_legislators']['gender']['filter']['handler'] = 'cd_civicrm_handler_filter_gender';
 }
 
 /**
@@ -92,6 +93,9 @@ function cd_civicrm_views_handlers() {
       ),
       'cd_civicrm_handler_filter_state' => array(
         'parent' => 'cd_sunlight_handler_filter_state',
+      ),
+      'cd_civicrm_handler_filter_gender' => array(
+        'parent' => 'views_handler_filter_in_operator',
       ),
     ),
   );

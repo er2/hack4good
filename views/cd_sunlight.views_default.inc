@@ -38,6 +38,7 @@ function cd_sunlight_views_default_views() {
   $handler->display->display_options['row_plugin'] = 'fields';
   $handler->display->display_options['row_options']['separator'] = ' ';
   $handler->display->display_options['row_options']['hide_empty'] = 1;
+
   /* Field: Congress: Picture */
   $handler->display->display_options['fields']['picture']['id'] = 'picture';
   $handler->display->display_options['fields']['picture']['table'] = 'cd_sunlight_legislators';
@@ -125,8 +126,7 @@ function cd_sunlight_views_default_views() {
   $handler->display->display_options['fields']['title']['field'] = 'title';
   $handler->display->display_options['fields']['title']['label'] = '';
   $handler->display->display_options['fields']['title']['exclude'] = TRUE;
-  $handler->display->display_options['fields']['title']['alter']['alter_text'] = 1;
-  $handler->display->display_options['fields']['title']['alter']['text'] = '[title].';
+  $handler->display->display_options['fields']['title']['alter']['alter_text'] = 0;
   $handler->display->display_options['fields']['title']['alter']['make_link'] = 0;
   $handler->display->display_options['fields']['title']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['title']['alter']['word_boundary'] = 1;
@@ -218,8 +218,7 @@ function cd_sunlight_views_default_views() {
   $handler->display->display_options['fields']['party']['field'] = 'party';
   $handler->display->display_options['fields']['party']['label'] = '';
   $handler->display->display_options['fields']['party']['exclude'] = TRUE;
-  $handler->display->display_options['fields']['party']['alter']['alter_text'] = 1;
-  $handler->display->display_options['fields']['party']['alter']['text'] = '([party])';
+  $handler->display->display_options['fields']['party']['alter']['alter_text'] = 0;
   $handler->display->display_options['fields']['party']['alter']['make_link'] = 0;
   $handler->display->display_options['fields']['party']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['party']['alter']['word_boundary'] = 1;
@@ -495,6 +494,7 @@ function cd_sunlight_views_default_views() {
   $handler->display->display_options['fields']['representative_data']['alter']['html'] = 0;
   $handler->display->display_options['fields']['representative_data']['hide_empty'] = 0;
   $handler->display->display_options['fields']['representative_data']['empty_zero'] = 0;
+
   /* Sort criterion: Congress: State */
   $handler->display->display_options['sorts']['state']['id'] = 'state';
   $handler->display->display_options['sorts']['state']['table'] = 'cd_sunlight_legislators';
@@ -503,6 +503,21 @@ function cd_sunlight_views_default_views() {
   $handler->display->display_options['sorts']['district']['id'] = 'district';
   $handler->display->display_options['sorts']['district']['table'] = 'cd_sunlight_legislators';
   $handler->display->display_options['sorts']['district']['field'] = 'district';
+
+  /* Argument: Congress: State */
+  $handler->display->display_options['arguments']['state']['id'] = 'state';
+  $handler->display->display_options['arguments']['state']['table'] = 'cd_sunlight_legislators';
+  $handler->display->display_options['arguments']['state']['field'] = 'state';
+  $handler->display->display_options['arguments']['state']['style_plugin'] = 'default_summary';
+  $handler->display->display_options['arguments']['state']['default_argument_type'] = 'fixed';
+  /* Argument: Congress: District */
+  $handler->display->display_options['arguments']['district']['id'] = 'district';
+  $handler->display->display_options['arguments']['district']['table'] = 'cd_sunlight_legislators';
+  $handler->display->display_options['arguments']['district']['field'] = 'district';
+  $handler->display->display_options['arguments']['district']['style_plugin'] = 'default_summary';
+  $handler->display->display_options['arguments']['district']['default_argument_type'] = 'fixed';
+  $handler->display->display_options['arguments']['district']['break_phrase'] = 1;
+  $handler->display->display_options['arguments']['district']['not'] = 0;
 
   /* Display: Page */
   $handler = $view->new_display('page', 'Page', 'page_1');
