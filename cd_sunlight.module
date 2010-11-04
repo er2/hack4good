@@ -77,7 +77,7 @@ function cd_sunlight_menu() {
     'weight' => '2',
     'file' => 'cd_sunlight.admin.inc',
   );
-  if ($congress_view = views_get_view('congress')) {
+  if ($congress_view = views_get_view('Congress')) {
     if ($congress_view->type == t('Overridden')) {
       watchdog('cd_sunlight', 'The "Congress" view has been overridden.  The Congress Search form '.
         'depends on the default arguments to create its results.  If you have modified the '.
@@ -127,7 +127,7 @@ function cd_sunlight_form_alter(&$form, $form_state, $form_id) {
   if (
     $form_id == 'views_exposed_form' &&
     $form_state['view']->name == 'Congress' &&
-    user_access('views_exposed_form')
+    user_access('search congressional districts by zip')
   ) {
     $form['#suffix'] = '<p>'. t('Or <a href="!url">search for members of Congress by zip</a>.',
       array('!url' => url('congress-search')));

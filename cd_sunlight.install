@@ -515,6 +515,7 @@ function cd_sunlight_update_6003() {
   cache_clear_all('*', 'cache', TRUE);
   cache_clear_all('*', 'cache_views', TRUE);
   cache_clear_all('*', 'cache_menu', TRUE);
+  menu_rebuild();
 
   return $return;
 }
