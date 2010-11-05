@@ -948,7 +948,8 @@ function _cd_civicrm_process_queue() {
     // Hooks don't fire during older versions of CiviCRM cron scripts.  Enqueue all contacts that 
     // have lat/long,but not a CD.
     civicrm_initialize();
-    if (version_compare(CRM_Core_BAO_Domain::version() < '3.3.alpha1')) {
+    require_once 'CRM/Core/BAO/Domain.php';
+    if (version_compare(CRM_Core_BAO_Domain::version(), '3.3.alpha1', '<')) {
 
       $res = db_query(
         'SELECT a.contact_id '.
