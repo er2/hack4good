@@ -367,13 +367,3 @@ function cd_sunlight_views_handlers() {
     ),
   );
 }
-
-/**
- * Implementation of hook_views_post_render().
- */
-function cd_sunlight_views_post_render(&$view, &$output, &$cache) {
-  // Add our CSS.
-  // We don't pre-process because chances are this is not on the front page,
-  // and not on very many pages.
-  drupal_add_css(drupal_get_path('module', 'cd_sunlight') .'/cd_sunlight.css', 'module', 'all', FALSE);
-}
