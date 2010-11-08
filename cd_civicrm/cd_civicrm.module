@@ -33,7 +33,7 @@ define('CD_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE', variable_get('cd_civicrm_custom_fi
 // The country_id for United States.
 define('CD_CIVICRM_US_COUNTRY_ID', 1228);
 
-// The state_province_id for non-US.
+// The state_province_id for "non-US".
 define('CD_CIVICRM_NON_US_STATE_PROVINCE_ID', 1099);
 
 /**
@@ -770,7 +770,7 @@ function _cd_civicrm_api_lookup_contact($contact) {
     unset($_contact['latitude'], $_contact['longitude']);
   }
 
-  return cd_sunlight_api_lookup_contact($contact);
+  return cd_sunlight_api_lookup_contact($_contact);
 
 }
 
