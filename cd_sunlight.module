@@ -956,12 +956,10 @@ function _cd_sunlight_is_url_an_image($url) {
   }
 
   // Is it an image?
-  if (!isset($headers['content-type'])) {
-    return FALSE;
-  }
   if (
-    strpos($headers['content-type'], 'image') !== FALSE &&
-    strpos($headers['content-type'], 'application/octet-stream') !== FALSE
+    !isset($headers['content-type']) ||
+    strpos($headers['content-type'], 'image') === FALSE &&
+    strpos($headers['content-type'], 'application/octet-stream') === FALSE
   ) {
     return FALSE;
   }
