@@ -56,9 +56,9 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
 
   // Test the new one.
   if (!_cd_sunlight_connection_test()) {
-    form_set_error('cd_sunlight_api_key'
-      , t('Either the Sunlight key is not valid, or the Sunlight API is down. '
-        . 'See watchdog for more detailed information.'));
+    form_set_error('cd_sunlight_api_key',
+      t('Either the Sunlight key is not valid, or the Sunlight API is down. ' .
+      'See watchdog for more detailed information.'));
   }
   else {
     drupal_set_message(t('The Sunlight API key works.'));

@@ -29,8 +29,14 @@ function cd_civicrm_requirements($phase) {
   if ($phase == 'runtime') {
 
     // Raise an error if we do not have prefixes for all the CiviCRM tables.
-    $civicrm_tables = array('civicrm_custom_field', 'civicrm_contact', 'civicrm_address',
-      'civicrm_custom_group', 'civicrm_uf_match', variable_get('cd_civicrm_custom_table', ''));
+    $civicrm_tables = array(
+      'civicrm_custom_field',
+      'civicrm_contact',
+      'civicrm_address',
+      'civicrm_custom_group',
+      'civicrm_uf_match',
+      variable_get('cd_civicrm_custom_table', ''),
+    );
     $error_tables = array();
     foreach ($civicrm_tables as $table) {
       if ($table && !isset($db_prefix[$table])) {
@@ -39,21 +45,22 @@ function cd_civicrm_requirements($phase) {
     }
     $requirements['cd_civicrm_db'] = array(
       'title' => 'CD CiviCRM',
-      'description' => t('In %settings $db_prefix must be an array and you must have prefixes '.
-        'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a> '.
+      'description' => t('In %settings $db_prefix must be an array and you must have prefixes ' .
+        'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a> ' .
         'for more info.',
         array(
-          '%tables' => implode(', ', $civicrm_tables),
-          '!url' => url('civicrm/admin/setting/uf'),
-          '%settings' => conf_path() .'/settings.php',
-        )),
+        '%tables' => implode(', ', $civicrm_tables),
+        '!url' => url('civicrm/admin/setting/uf'),
+        '%settings' => conf_path() . '/settings.php',
+      )),
       'severity' => $error_tables ? REQUIREMENT_ERROR : REQUIREMENT_OK,
       'value' => t('settings.php DB Prefix'),
     );
     if ($error_tables) {
       $requirements['cd_civicrm_db']['description'] .= t(
         'Prefixes do not exist for the following tables: %tables.', array(
-          '%tables' => implode(', ', $error_tables)));
+        '%tables' => implode(', ', $error_tables),
+      ));
     }
 
     // If we already have an error, don't bother continuing, it will only confuse the admin.
@@ -87,7 +94,7 @@ function cd_civicrm_requirements($phase) {
         'value' => t('There are roughly !count contacts in the queue to be geocoded.',
           array('!count' => $count)),
         'count' => $count,
-        'severity' => REQUIREMENT_INFO
+        'severity' => REQUIREMENT_INFO,
       );
     }
 

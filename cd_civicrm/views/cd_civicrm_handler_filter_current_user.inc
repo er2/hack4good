@@ -4,7 +4,7 @@
 /**
  * @file
  * Views handlers for cd_civicrm.
- * 
+ *
  * @todo Change the block/page title appropriately.
  */
 
@@ -45,7 +45,7 @@ class cd_civicrm_handler_filter_district_current_user extends views_handler_filt
 
   function value_form(&$form, &$form_state) { }
 
-  function can_expose() { 
+  function can_expose() {
     return FALSE;
   }
 
@@ -54,7 +54,7 @@ class cd_civicrm_handler_filter_district_current_user extends views_handler_filt
 
     // Remember that senators have a CD of 0.
     $where = "$this->table_alias.$this->real_field IN (***CURRENT_USERS_DISTRICT***, 0)";
-    
+
     $this->query->add_where($this->options['group'], $where);
   }
 }

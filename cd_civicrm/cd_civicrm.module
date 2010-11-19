@@ -74,7 +74,7 @@ function cd_civicrm_cron() {
 
   // Test connection.
   if (!_cd_sunlight_connection_test()) {
-    watchdog('cd_civicrm', 'A connection cannot be made to Sunlight, '.
+    watchdog('cd_civicrm', 'A connection cannot be made to Sunlight, ' .
       'cd_civicrm_cron will not be run.', array(), WATCHDOG_ERROR);
     return;
   }
@@ -111,7 +111,7 @@ function cd_civicrm_form_cd_sunlight_settings_validate($form, &$form_state) {
 function cd_civicrm_views_api() {
   return array(
     'api' => '2.0',
-    'path' => drupal_get_path('module', 'cd_civicrm') .'/views',
+    'path' => drupal_get_path('module', 'cd_civicrm') . '/views',
   );
 }
 
@@ -155,7 +155,7 @@ function cd_civicrm_civicrm_pre($op, $object_type, $contact_id, &$ref) {
   else {
 
     // Bloody hell!  CiviCRM might pass in an object, or an array, and it may have different depths.
-    $_ref = (array)$ref;
+    $_ref = (array) $ref;
     // CiviCRM 2.0-2.2 compatible.
     if (isset($_ref['location'][1]['address'])) {
       foreach ($_ref['location'] as $location) {
@@ -243,8 +243,8 @@ function cd_civicrm_civicrm_pre($op, $object_type, $contact_id, &$ref) {
       $geo_code_reset = TRUE;
     }
     if (!$geo_code_reset) {
-     $backtrace = _cd_sunlight_backtrace();
-      watchdog('cd_civicrm', 'Error durring geocode reset.  This version of CiviCRM might not '.
+      $backtrace = _cd_sunlight_backtrace();
+      watchdog('cd_civicrm', 'Error durring geocode reset.  This version of CiviCRM might not ' .
         'be supported. @backtrace @ref', array('@backtrace' => $backtrace, var_export($ref, TRUE)),
         WATCHDOG_ERROR, cd_civicrm_contact_link('view', $contact_id));
       return TRUE;
@@ -318,7 +318,7 @@ function cd_civicrm_civicrm_post($op, $object_type, $contact_id, $ref) {
  * @return string
  */
 function cd_civicrm_contact_link($text, $contact_id) {
-  return l($text, 'civicrm/contact/view', array('query' => 'reset=1&cid='. $contact_id));
+  return l($text, 'civicrm/contact/view', array('query' => 'reset=1&cid=' . $contact_id));
 }
 
 
@@ -345,10 +345,10 @@ function cd_civicrm_contact_get_cd($contact_id, $reset = FALSE) {
     // Find the contact.
     // The CiviCRM API is totally not performant.
     // A manual query will be just as easy and far faster.
-    $sql = 'SELECT '.
-        CD_CIVICRM_CUSTOM_FIELD_CD .' AS '. CD_CIVICRM_CD  .', '.
-        CD_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE .' AS '. CD_CIVICRM_CD_OVERRIDE .
-      ' FROM {'. CD_CIVICRM_CUSTOM_TABLE .'} '.
+    $sql = 'SELECT ' .
+        CD_CIVICRM_CUSTOM_FIELD_CD . ' AS ' . CD_CIVICRM_CD  . ', ' .
+        CD_CIVICRM_CUSTOM_FIELD_CD_OVERRIDE . ' AS ' . CD_CIVICRM_CD_OVERRIDE .
+      ' FROM {' . CD_CIVICRM_CUSTOM_TABLE . '} ' .
       ' WHERE entity_id = %d';
     $contact = db_fetch_array(db_query($sql, $contact_id));
     if (!empty($contact[CD_CIVICRM_CD_OVERRIDE])) {
@@ -384,7 +384,7 @@ function cd_civicrm_contact_get_state($contact_id) {
  * Get the contact's CD district.
  *
  * @param int $contact_id
- * 
+ *
  * @return int
  *  ex. 17 or NULL if not set.
  */
@@ -579,20 +579,20 @@ function _cd_civicrm_contacts_geocode() {
   if ($http_user = _cd_civicrm_crypt_decrypt(variable_get('cd_civicrm_http_auth_user', ''))) {
     $credentials = $http_user;
     if ($http_pass = _cd_civicrm_crypt_decrypt(variable_get('cd_civicrm_http_auth_password', ''))) {
-      $credentials .= ':'. $http_pass;
+      $credentials .= ':' . $http_pass;
     }
     $credentials .= '@';
   }
   $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
-  $url = str_replace('://', '://'. $credentials, $url);
+  $url = str_replace('://', '://' . $credentials, $url);
 
   // Run the CiviCRM cron script.
   watchdog(
     'cd_civicrm', 'Batch geocoding @count CiviCRM contacts. IDs @ids.',
     array(
-      '@count' => variable_get('cd_civicrm_cron_contact_limit', 200),
-      '@ids' => $start_id . ' through '. $end_id,
-    ),
+    '@count' => variable_get('cd_civicrm_cron_contact_limit', 200),
+    '@ids' => $start_id . ' through ' . $end_id,
+  ),
     WATCHDOG_INFO
   );
   $response = drupal_http_request($url, array(), 'GET', NULL, 3, 200);
@@ -602,8 +602,8 @@ function _cd_civicrm_contacts_geocode() {
     watchdog('cd_civicrm', '@data', array('@data' => $response->data), WATCHDOG_INFO);
   }
   elseif (empty($response->code)) {
-    watchdog('cd_civicrm', 'Error during contact geocoding.  There was likely a timeout.  You '.
-      'may need to decrease the cron contact limit, and/or install <a href="!patch_url">this '.
+    watchdog('cd_civicrm', 'Error during contact geocoding.  There was likely a timeout.  You ' .
+      'may need to decrease the cron contact limit, and/or install <a href="!patch_url">this ' .
       'patch<a/>', array('!patch_url' => 'http://drupal.org/node/156582#comment-577135'),
       WATCHDOG_ERROR);
   }
@@ -615,8 +615,8 @@ function _cd_civicrm_contacts_geocode() {
     $query_string = drupal_query_string_encode($query);
     $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
     watchdog('cd_civicrm', 'Error during contact geocoding: @error', array(
-        '@error' => $response->code . ': ' . $response->error . ': ' . $url . '; ' . $response->data
-      ),
+      '@error' => $response->code . ': ' . $response->error . ': ' . $url . '; ' . $response->data,
+    ),
       WATCHDOG_ERROR
     );
   }
@@ -643,7 +643,7 @@ function _cd_civicrm_batch(&$context) {
   $res = db_query('SELECT id
     FROM {civicrm_contact}
     WHERE id > %d
-    ORDER BY id LIMIT 0, '. $limit,
+    ORDER BY id LIMIT 0, ' . $limit,
     $context['sandbox']['contact_id']);
   while ($contact = db_fetch_array($res)) {
     $contact = _cd_civicrm_civicrm_contact_get(array('contact_id' => $contact['id']));
@@ -654,7 +654,7 @@ function _cd_civicrm_batch(&$context) {
     }
     cd_civicrm_validate_civicrm_data($contact);
     $context['sandbox']['contact_id'] = $contact['contact_id'];
-    $context['sandbox']['progress'] ++;
+    $context['sandbox']['progress']++;
   }
 
   // Are we finished?
@@ -696,7 +696,7 @@ function _cd_civicrm_uid_get_contact_id($uid) {
  * Lookup the contact's uid.
  *
  * @param integer $contact_id
- * 
+ *
  * @return mixed $uid
  *  Integer if it exists, else NULL
  */
@@ -797,8 +797,8 @@ function _cd_civicrm_contact_cd_update($contact_id) {
     'return.street_address' => TRUE,
     'return.state_province' => TRUE,
     'return.country' => TRUE,
-    'return.'. CD_CIVICRM_CD_OVERRIDE => TRUE,
-    'return.'. CD_CIVICRM_CD => TRUE,
+    'return.' . CD_CIVICRM_CD_OVERRIDE => TRUE,
+    'return.' . CD_CIVICRM_CD => TRUE,
   );
   $contact = _cd_civicrm_civicrm_contact_get($params);
   if (civicrm_error($contact)) {
@@ -860,7 +860,7 @@ function _cd_civicrm_contact_cd_update($contact_id) {
  * @param boolean $set_state
  *  To set whether _cd_civicrm_contact_set_cd() is running, pass in TRUE or FALSE,
  *  or nothing to get the current status.
- * 
+ *
  * @return boolean
  */
 function _cd_civicrm_contact_set_cd_is_running($set_state = NULL) {
@@ -945,35 +945,35 @@ function _cd_civicrm_process_queue() {
   if (variable_get('cd_civicrm_geocoding_off', FALSE)) {
     _cd_civicrm_contacts_geocode();
 
-    // Hooks don't fire during older versions of CiviCRM cron scripts.  Enqueue all contacts that 
+    // Hooks don't fire during older versions of CiviCRM cron scripts.  Enqueue all contacts that
     // have lat/long,but not a CD.
     civicrm_initialize();
     require_once 'CRM/Core/BAO/Domain.php';
     if (version_compare(CRM_Core_BAO_Domain::version(), '3.3.alpha1', '<')) {
 
       $res = db_query(
-        'SELECT a.contact_id '.
-        'FROM {civicrm_address} a '.
-        'LEFT JOIN {'. CD_CIVICRM_CUSTOM_TABLE .'} c '.
-          'ON c.entity_id = a.contact_id '.
-        'WHERE ( '.
-            'c.'. CD_CIVICRM_CUSTOM_FIELD_CD .' IS NULL '.
-            'OR c.'. CD_CIVICRM_CUSTOM_FIELD_CD .' = "" '.
-          ') '.
-          'AND a.is_primary = 1 '.
-          'AND a.geo_code_1 IS NOT NULL '.
-          'AND a.geo_code_1 <> 0 '.
-          'AND a.country_id = '. CD_CIVICRM_US_COUNTRY_ID .' '.
-          'AND a.state_province_id <> '. CD_CIVICRM_NON_US_STATE_PROVINCE_ID .' '.
-          'AND ( '.
-            '( '.
-              'a.postal_code IS NOT NULL AND '.
-              'a.postal_code <> "" '.
-            ') '.
-            'OR ( '.
-              'a.street_address IS NOT NULL AND '.
-              'a.street_address <> "" '.
-            ') '.
+        'SELECT a.contact_id ' .
+        'FROM {civicrm_address} a ' .
+        'LEFT JOIN {' . CD_CIVICRM_CUSTOM_TABLE . '} c ' .
+          'ON c.entity_id = a.contact_id ' .
+        'WHERE ( ' .
+            'c.' . CD_CIVICRM_CUSTOM_FIELD_CD . ' IS NULL ' .
+            'OR c.' . CD_CIVICRM_CUSTOM_FIELD_CD . ' = "" ' .
+          ') ' .
+          'AND a.is_primary = 1 ' .
+          'AND a.geo_code_1 IS NOT NULL ' .
+          'AND a.geo_code_1 <> 0 ' .
+          'AND a.country_id = ' . CD_CIVICRM_US_COUNTRY_ID . ' ' .
+          'AND a.state_province_id <> ' . CD_CIVICRM_NON_US_STATE_PROVINCE_ID . ' ' .
+          'AND ( ' .
+            '( ' .
+              'a.postal_code IS NOT NULL AND ' .
+              'a.postal_code <> "" ' .
+            ') ' .
+            'OR ( ' .
+              'a.street_address IS NOT NULL AND ' .
+              'a.street_address <> "" ' .
+            ') ' .
           ') '
       );
       $count = 0;
@@ -981,7 +981,7 @@ function _cd_civicrm_process_queue() {
         // Some buggy versions of CiviCRM have addresses with no contact_id.
         if (!empty($contact->cid)) {
           cd_sunlight_contact_enqueue('civicrm', $contact->contact_id);
-          $count ++;
+          $count++;
         }
       }
       watchdog('cd_civicrm', 'Enqueued @count contacts with new geocodes', array('@count' => $count),
@@ -1019,7 +1019,7 @@ function _cd_civicrm_process_queue() {
  *  'enabled' or 'disabled'
  * @param string $set_database = FALSE
  *  Save the setting to the database as well?
- * 
+ *
  * @return boolean
  *  FALSE if this site has not been setup for this, else TRUE.
  */
@@ -1032,9 +1032,9 @@ function _cd_civicrm_geocode_set($status = 'disabled', $set_database = FALSE) {
   civicrm_initialize();
 
   // Set the in-memory configuration.
-  $config =& CRM_Core_Config::singleton( );
+  $config = & CRM_Core_Config::singleton( );
   if ($status == 'enabled' && !empty($config->mapProvider)) {
-    $config->geocodeMethod = 'CRM_Utils_Geocode_'. $config->mapProvider;
+    $config->geocodeMethod = 'CRM_Utils_Geocode_' . $config->mapProvider;
   }
   else {
     $config->geocodeMethod = NULL;
@@ -1135,7 +1135,7 @@ function _cd_civicrm_civicrm_contact_get($search_params) {
       $t_args = array(
         '@backtrace' => $backtrace,
         '@search_params' => var_export($search_params, TRUE),
-        '@contact' => var_export($contact, TRUE)
+        '@contact' => var_export($contact, TRUE),
       );
       watchdog(
         'cd_civicrm',

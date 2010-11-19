@@ -28,9 +28,9 @@ function cd_civicrm_settings_form() {
       . ' a user, password and key for CiviCRM Command-line usage</a>. Enter these values below. '
       . '<br /><em>NOTE: 95% of sites will not require or see any benefit from batch geocoding.</em>'
       , array(
-        '!url_geocode' => url('civicrm/admin/setting/mapping'),
-        '!url_setup' => 'http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration',
-      )),
+      '!url_geocode' => url('civicrm/admin/setting/mapping'),
+      '!url_setup' => 'http://wiki.civicrm.org/confluence/display/CRMDOC/Command-line+Script+Configuration',
+    )),
   );
   $form['geocode']['cd_civicrm_geocoding_off'] = array(
     '#type' => 'checkbox',
@@ -49,8 +49,8 @@ function cd_civicrm_settings_form() {
     '#value' => _cd_civicrm_crypt_enabled() ? 'Available' : 'Not available',
     '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the '
       . 'username. ', array(
-        '!url' => 'http://www.php.net/manual/en/book.mcrypt.php',
-      )),
+      '!url' => 'http://www.php.net/manual/en/book.mcrypt.php',
+    )),
   );
   $form['geocode']['cd_civicrm_geocode_username'] = array(
     '#type' => 'textfield',
@@ -70,7 +70,7 @@ function cd_civicrm_settings_form() {
   );
   $form['geocode']['http_auth'] = array(
     '#type' => 'fieldset',
-    '#description' => t('If this site requires HTTP authentication.  Please enter the credentials '.
+    '#description' => t('If this site requires HTTP authentication.  Please enter the credentials ' .
       'below'),
     '#title' => 'HTTP Authentication',
   );
@@ -90,10 +90,10 @@ function cd_civicrm_settings_form() {
   );
   $form['geocode']['test'] = array(
     '#type' => 'fieldset',
-    '#description' => t('Any issues shown here, or in <a href="!url">the logs</a> (PHP timeouts, '.
+    '#description' => t('Any issues shown here, or in <a href="!url">the logs</a> (PHP timeouts, ' .
         'etc.) must be resolved before batch geocoding will work. ', array(
-        '!url' => url('admin/reports/dblog'),
-      )),
+      '!url' => url('admin/reports/dblog'),
+    )),
   );
   $form['geocode']['test']['test'] = array(
     '#type' => 'submit',
@@ -168,7 +168,7 @@ function cd_civicrm_settings_fields_form() {
       WHERE data_type = "string"
       ORDER BY custom_group_id, weight');
     while ($field = db_fetch_array($resource)) {
-      $fields[$field['id']] = $field['custom_group_id'] .': '. check_plain($field['label']);
+      $fields[$field['id']] = $field['custom_group_id'] . ': ' . check_plain($field['label']);
     }
   }
 
@@ -178,7 +178,7 @@ function cd_civicrm_settings_fields_form() {
       'CiviCRM Congressional District stores congressional district data for each CiviCRM '
       . 'contact in a set of CiviCRM custom fields.  First create these fields <a href="!url">within '
       . 'CiviCRM</a> according to the descriptions below. ',
-      array('!url' => url('civicrm/admin/custom/group'))) .'</p>' ,
+      array('!url' => url('civicrm/admin/custom/group'))) . '</p>',
   );
 
   $field_cd_civicrm_cd = variable_get('cd_civicrm_cd', '');
@@ -253,9 +253,9 @@ function cd_civicrm_settings_fields_form_submit($form, &$form_state) {
   variable_set('cd_civicrm_custom_table',
     $field_cd_civicrm_cd->table_name);
   variable_set('cd_civicrm_civicrm_cd',
-    'custom_'. $field_cd_civicrm_cd->id);
+    'custom_' . $field_cd_civicrm_cd->id);
   variable_set('cd_civicrm_cd_override',
-    'custom_'. $field_cd_civicrm_cd_override->id);
+    'custom_' . $field_cd_civicrm_cd_override->id);
   variable_set('cd_civicrm_custom_field_cd',
     $field_cd_civicrm_cd->column_name);
   variable_set('cd_civicrm_custom_field_cd_override',

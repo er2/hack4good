@@ -39,7 +39,7 @@ function cd_civicrm_views_data_alter(&$data) {
  */
 function cd_civicrm_views_default_views_alter(&$views) {
   if (isset($views['Congress'])) {
-    $view =& $views['Congress'];
+    $view = & $views['Congress'];
     /* Display: Block - Current user */
     $handler = $view->new_display('block', 'Block - Current user', 'block_3');
     $handler->display->display_options['defaults']['filters'] = FALSE;
@@ -80,7 +80,7 @@ function cd_civicrm_views_default_views_alter(&$views) {
 function cd_civicrm_views_handlers() {
   return array(
     'info' => array(
-      'path' => drupal_get_path('module', 'cd_civicrm') .'/views',
+      'path' => drupal_get_path('module', 'cd_civicrm') . '/views',
     ),
     'handlers' => array(
       'cd_civicrm_handler_filter_state_current_user' => array(
@@ -113,7 +113,7 @@ function cd_sunlight_views_query_substitutions($view) {
     if ($user->uid) {
       $cd = cd_civicrm_user_get_cd($user->uid);
       if ($cd && $cd != 'not found') {
-        $substitutions['***CURRENT_USERS_STATE***'] = "'". cd_sunlight_cd_parse_state($cd) ."'";
+        $substitutions['***CURRENT_USERS_STATE***'] = "'" . cd_sunlight_cd_parse_state($cd) . "'";
         $substitutions['***CURRENT_USERS_DISTRICT***'] = intval(cd_sunlight_cd_parse_district($cd));
       }
     }
