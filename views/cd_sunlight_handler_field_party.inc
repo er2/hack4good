@@ -43,7 +43,7 @@ class cd_sunlight_handler_field_party extends views_handler_field {
         $party = $values->cd_sunlight_legislators_party;
         break;
       case 'period':
-        $party = drupal_substr($values->cd_sunlight_legislators_party, 0, 1) .'.';
+        $party = drupal_substr($values->cd_sunlight_legislators_party, 0, 1) . '.';
         break;
       default:
         $party = drupal_substr($values->cd_sunlight_legislators_party, 0, 1);

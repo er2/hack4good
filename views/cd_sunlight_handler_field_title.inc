@@ -32,7 +32,7 @@ class cd_sunlight_handler_field_title extends views_handler_field {
       return;
     }
     if ($this->options['format'] != 'full') {
-      return $values->cd_sunlight_legislators_title .'.';
+      return $values->cd_sunlight_legislators_title . '.';
     }
     $titles = array(
       'Sen' => t('Senator'),

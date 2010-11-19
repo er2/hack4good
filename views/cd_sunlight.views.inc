@@ -261,7 +261,6 @@ function cd_sunlight_views_data() {
       'help' => t('http://progressivepunch.org'),
       'handler' => 'cd_sunlight_handler_field_url_favicon_progressive_punch',
     ),
-
   );
 
   return $data;
@@ -273,7 +272,7 @@ function cd_sunlight_views_data() {
 function cd_sunlight_views_handlers() {
   return array(
     'info' => array(
-      'path' => drupal_get_path('module', 'cd_sunlight') .'/views',
+      'path' => drupal_get_path('module', 'cd_sunlight') . '/views',
     ),
     'handlers' => array(
       'cd_sunlight_handler_field_congress_picture' => array(

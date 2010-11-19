@@ -22,7 +22,7 @@
  * @ingroup views_field_handlers
  */
 class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
-  
+
   protected $favicon_url;
   protected $human_readable;
   protected $url_path;
@@ -73,7 +73,10 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
       if (empty($value)) {
         $value = check_plain($this->human_readable);
       }
-      $l_options = array('html' => TRUE, 'query' => $this->url_query);
+      $l_options = array(
+        'html' => TRUE,
+        'query' => $this->url_query,
+      );
       $l_options['attributes']['class'] = $class;
       if (empty($this->options['display_as_favicon'])) {
         $l_options['attributes']['title'] = $this->human_readable;
@@ -81,10 +84,10 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
       if (!empty($this->options['new_window'])) {
         $l_options['attributes']['target'] = '_blank';
       }
-      return l('<span>'. $value .'</span>', $this->url_path, $l_options);
+      return l('<span>' . $value . '</span>', $this->url_path, $l_options);
     }
     else {
-      return '<span class="'. $class .'">'. check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query) .'</span>';
+      return '<span class="' . $class . '">' . check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query) . '</span>';
     }
   }
 
@@ -118,7 +121,7 @@ class cd_sunlight_handler_field_url_favicon_bioguide extends cd_sunlight_handler
     $this->favicon_url = 'http://bioguide.congress.gov/favicon.ico';
     $this->human_readable = 'Bioguide';
     $this->url_path = 'http://bioguide.congress.gov/scripts/biodisplay.pl';
-    $this->url_query = 'index='. $values->{$this->field_alias};
+    $this->url_query = 'index=' . $values->{$this->field_alias};
     return parent::render($values);
   }
 
@@ -135,7 +138,7 @@ class cd_sunlight_handler_field_url_favicon_votesmart extends cd_sunlight_handle
     $this->favicon_url = 'http://votesmart.org/favicon.ico';
     $this->human_readable = 'Project Vote Smart';
     $this->url_path = 'http://votesmart.org/bio.php';
-    $this->url_query = 'can_id='. $values->{$this->field_alias};
+    $this->url_query = 'can_id=' . $values->{$this->field_alias};
     return parent::render($values);
   }
 
@@ -152,7 +155,7 @@ class cd_sunlight_handler_field_url_favicon_govtrack extends cd_sunlight_handler
     $this->favicon_url = 'http://www.govtrack.us/favicon.ico';
     $this->human_readable = 'Govtrack';
     $this->url_path = 'http://govtrack.us/congress/person.xpd';
-    $this->url_query = 'id='. $values->{$this->field_alias};
+    $this->url_query = 'id=' . $values->{$this->field_alias};
     return parent::render($values);
   }
 
@@ -169,7 +172,7 @@ class cd_sunlight_handler_field_url_favicon_opensecrets extends cd_sunlight_hand
     $this->favicon_url = 'http://www.opensecrets.org/img/favicon.ico';
     $this->human_readable = 'OpenSecrets';
     $this->url_path = 'http://www.opensecrets.org/politicians/summary.php';
-    $this->url_query = 'cid='. $values->{$this->field_alias};
+    $this->url_query = 'cid=' . $values->{$this->field_alias};
     return parent::render($values);
   }
 
@@ -202,7 +205,7 @@ class cd_sunlight_handler_field_url_favicon_twitter extends cd_sunlight_handler_
   function render($values) {
     $this->favicon_url = 'http://twitter.com/favicon.ico';
     $this->human_readable = 'Twitter';
-    $this->url_path = 'http://twitter.com/'. $values->{$this->field_alias};
+    $this->url_path = 'http://twitter.com/' . $values->{$this->field_alias};
     $this->url_query = NULL;
     return parent::render($values);
   }
@@ -283,8 +286,8 @@ class cd_sunlight_handler_field_url_favicon_generic extends cd_sunlight_handler_
       if (empty($url['path'])) {
         $url['path'] = '/';
       }
-      $this->favicon_url = $url['scheme'] .'://'. $url['host'] .'/favicon.ico';
-      $this->url_path = $url['scheme'] .'://'. $url['host'] .''. $url['path'];
+      $this->favicon_url = $url['scheme'] . '://' . $url['host'] . '/favicon.ico';
+      $this->url_path = $url['scheme'] . '://' . $url['host'] . '' . $url['path'];
       $this->url_query = isset($url['query']) ? $url['query'] : NULL;
     }
     return parent::render($values);

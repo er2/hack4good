@@ -33,18 +33,18 @@ function cd_sunlight_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-     'request_uri' => array(
+      'request_uri' => array(
         'type' => 'varchar',
         'length' => '255',
         'not null' => FALSE,
       ),
-     'backtrace' => array(
+      'backtrace' => array(
         'type' => 'text',
         'not null' => FALSE,
         'size' => 'big',
         'description' => 'Optional backtrace. Only stored when debugging mode is enabled.',
       ),
-     'insert_time' => array(
+      'insert_time' => array(
         'description' => t('When this row was inserted.'),
         'type' => 'int',
         'unsigned' => TRUE,
@@ -232,7 +232,7 @@ function cd_sunlight_schema() {
         'type' => 'varchar',
         'length' => '3',
         'not null' => TRUE,
-        'default' => ''
+        'default' => '',
       ),
       'birthdate' => array(
         'description' => t("YYYY-MM-DD formatted birth date."),
@@ -277,7 +277,7 @@ function cd_sunlight_requirements($phase) {
       'title' => 'CiviCRM Sunlight Congressional District lookups',
       'value' => t('A total of !count lookups to Sunlight have been performed.',
         array('!count' => number_format(variable_get('cd_sunlight_total_lookups', 0)))),
-      'severity' => REQUIREMENT_INFO
+      'severity' => REQUIREMENT_INFO,
     );
 
     // Report the number of records in the lookup queue.
@@ -287,7 +287,7 @@ function cd_sunlight_requirements($phase) {
       'value' => t('There are !count contacts in the queue for a CD lookup.',
         array('!count' => $count)),
       'count' => $count,
-      'severity' => REQUIREMENT_INFO
+      'severity' => REQUIREMENT_INFO,
     );
 
     // Report the number of records in the batch geocoding queue.
@@ -301,7 +301,7 @@ function cd_sunlight_requirements($phase) {
         'value' => t('There are !count contacts in the queue to be geocoded.',
           array('!count' => $count)),
         'count' => $count,
-        'severity' => REQUIREMENT_INFO
+        'severity' => REQUIREMENT_INFO,
       );
     }
 
@@ -394,18 +394,18 @@ function cd_sunlight_update_6001() {
         'not null' => TRUE,
         'default' => 0,
       ),
-     'request_uri' => array(
+      'request_uri' => array(
         'type' => 'varchar',
         'length' => '255',
         'not null' => FALSE,
       ),
-     'backtrace' => array(
+      'backtrace' => array(
         'type' => 'text',
         'not null' => FALSE,
         'size' => 'big',
         'description' => 'Optional backtrace. Only stored when debugging mode is enabled.',
       ),
-     'insert_time' => array(
+      'insert_time' => array(
         'description' => t('When this row was inserted.'),
         'type' => 'int',
         'unsigned' => TRUE,
@@ -445,7 +445,7 @@ function cd_sunlight_update_6002() {
     'type' => 'varchar',
     'length' => '3',
     'not null' => TRUE,
-    'default' => ''
+    'default' => '',
   );
   db_add_field($return, 'cd_sunlight_legislators', 'senate_class', $senate_class);
   $birthdate = array(
@@ -466,7 +466,10 @@ function cd_sunlight_update_6003() {
   // Enable module.
   module_rebuild_cache();
   drupal_install_modules(array('cd_civicrm'));
-  $return[] = array('success' => TRUE, 'query' => 'Enabled CD CiviCRM module.');
+  $return[] = array(
+    'success' => TRUE,
+    'query' => 'Enabled CD CiviCRM module.',
+  );
 
   // Add new field.
   $storage_system = array(

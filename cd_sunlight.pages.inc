@@ -22,10 +22,10 @@ function cd_sunlight_search_form(&$form_state, $zip = NULL, $state = NULL, $dist
   // Do we have access to the Congress page view.
   $congress_path = menu_get_item('congress');
   if (!empty($congress_path['access'])) {
-    $form['instructions']['#value'] .= ' '.
+    $form['instructions']['#value'] .= ' ' .
       t('Or <a href="!url">browse all members of Congress</a>.', array('!url' => url('congress')));
   }
-  $form['instructions']['#value'] = '<p>'. $form['instructions']['#value'] .'</p>';
+  $form['instructions']['#value'] = '<p>' . $form['instructions']['#value'] . '</p>';
 
   $form['zip'] = array(
     '#title' => t('Zip Code (five digits)'),
@@ -33,7 +33,7 @@ function cd_sunlight_search_form(&$form_state, $zip = NULL, $state = NULL, $dist
     '#size' => 6,
     '#maxlength' => 5,
     '#required' => TRUE,
-    '#default_value' => $zip ? $zip : ''
+    '#default_value' => $zip ? $zip : '',
   );
   $form['submit'] = array(
     '#value' => 'Search',
@@ -46,7 +46,7 @@ function cd_sunlight_search_form(&$form_state, $zip = NULL, $state = NULL, $dist
       '%zip' => $zip,
       '%cd' => $state . $district,
     );
-    $results = '<h3>'. ($zip ? t('%zip is in %cd', $t_arguments) : t('%cd', $t_arguments)) .'</h3>'.
+    $results = '<h3>' . ($zip ? t('%zip is in %cd', $t_arguments) : t('%cd', $t_arguments)) . '</h3>' .
       views_embed_view('congress', 'default', $state, $district);
 
     // The more link is retaining the arguments.  Get rid of them.

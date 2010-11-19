@@ -1,7 +1,7 @@
 <?php
 //$Id$
 
-/* 
+/*
  * @file
  * Admin menu callbacks for cd_sunlight.
  */
@@ -58,7 +58,7 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
   if (!_cd_sunlight_connection_test()) {
     form_set_error('cd_sunlight_api_key'
       , t('Either the Sunlight key is not valid, or the Sunlight API is down. '
-        .'See watchdog for more detailed information.'));
+        . 'See watchdog for more detailed information.'));
   }
   else {
     drupal_set_message(t('The Sunlight API key works.'));
@@ -70,7 +70,7 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
   // Are the contact limit and load limit numeric?
   if (!empty($form_state['values']['cd_sunlight_cron_contact_limit'])) {
     $contact_limit = $form_state['values']['cd_sunlight_cron_contact_limit'];
-    if (!is_numeric($contact_limit) || (int)$contact_limit != $contact_limit) {
+    if (!is_numeric($contact_limit) || (int) $contact_limit != $contact_limit) {
       form_set_error('cd_sunlight_cron_contact_limit',
         t('The contact limit must be an integer.'));
     }
@@ -93,7 +93,7 @@ function cd_sunlight_batch_confirm() {
   return confirm_form(array(),
     t('Process all contacts'),
     'admin/settings/cd_sunlight',
-    t('Are you sure you want to process all contacts, queuing those that require a Congressional '.
+    t('Are you sure you want to process all contacts, queuing those that require a Congressional ' .
       'District? This action iterates through all contacts in CiviCRM, and may be a lengthy process.'),
     t('Process all contacts'),
     t('Cancel')
@@ -109,7 +109,7 @@ function cd_sunlight_batch_confirm_submit($form, &$form_state) {
     'title' => t('Processing contacts.'),
     'init_message' => t('Starting.'),
     'error_message' => t('An error occurred and some contacts have not been processed.'),
-    'file' => drupal_get_path('module', 'cd_sunlight') .'/cd_sunlight.admin.inc',
+    'file' => drupal_get_path('module', 'cd_sunlight') . '/cd_sunlight.admin.inc',
   );
   if (function_exists('_cd_civicrm_batch')) {
     $batch['operations'][] = array('_cd_civicrm_batch', array());
@@ -160,12 +160,12 @@ function cd_sunlight_log() {
   }
 
   // Build data.
-  $res = pager_query('SELECT * FROM {cd_sunlight_cron} '. tablesort_sql($header), 50);
+  $res = pager_query('SELECT * FROM {cd_sunlight_cron} ' . tablesort_sql($header), 50);
   while ($record = db_fetch_object($res)) {
-    
+
     // Get a link to the contact.
     $contact_link = $record->contact_id;
-    $function = 'cd_'. $record->storage_system .'_contact_link';
+    $function = 'cd_' . $record->storage_system . '_contact_link';
     if (function_exists($function)) {
       $contact_link = $function($record->contact_id, $record->contact_id);
     }
@@ -178,11 +178,11 @@ function cd_sunlight_log() {
       check_plain($record->request_uri),
     );
     if (variable_get('cd_sunlight_debug', FALSE)) {
-      $row[] = '<pre>'. check_plain($record->backtrace) .'</pre>';
+      $row[] = '<pre>' . check_plain($record->backtrace) . '</pre>';
     }
     $rows[] = $row;
   }
-  
+
   // Create output;
   $output = theme('table', $header, $rows);
   $output .= theme('pager', array(), 50);
@@ -198,16 +198,16 @@ function cd_sunlight_log_summary() {
   // Totals.
   $first_record = format_date(db_result(db_query('SELECT MIN(insert_time) FROM {cd_sunlight_cron}')));
   $last_record = format_date(db_result(db_query('SELECT MAX(insert_time) FROM {cd_sunlight_cron}')));
-  $output .= '<p>'. t('Log contains data from : %first_record to %last_record',
-      array('%first_record' => $first_record, '%last_record' => $last_record)) .'</p>';
+  $output .= '<p>' . t('Log contains data from : %first_record to %last_record',
+      array('%first_record' => $first_record, '%last_record' => $last_record)) . '</p>';
   $total_unprocessed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0'));
   $total_processed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 1'));
-  $output .= '<p>'. t('Total records in the queue: %count',
-    array('%count' => number_format($total_processed + $total_unprocessed))) .'</p>';
-  $output .= '<p>'. t('Total records that have been processed: %count',
-    array('%count' => number_format($total_processed))) .'</p>';
-  $output .= '<p>'. t('Total records that have not been processed: %count',
-    array('%count' => number_format($total_unprocessed))) .'</p>';
+  $output .= '<p>' . t('Total records in the queue: %count',
+    array('%count' => number_format($total_processed + $total_unprocessed))) . '</p>';
+  $output .= '<p>' . t('Total records that have been processed: %count',
+    array('%count' => number_format($total_processed))) . '</p>';
+  $output .= '<p>' . t('Total records that have not been processed: %count',
+    array('%count' => number_format($total_unprocessed))) . '</p>';
 
   // Most common contacts.
   $header = array('Contact', 'Count');
@@ -219,7 +219,7 @@ function cd_sunlight_log_summary() {
     LIMIT 10');
   while ($record = db_fetch_object($result)) {
     $row = array(
-      l($record->contact_id, 'civicrm/contact/view', array('query' => 'reset=1&cid='. $record->contact_id)),
+      l($record->contact_id, 'civicrm/contact/view', array('query' => 'reset=1&cid=' . $record->contact_id)),
       $record->cnt,
     );
     $rows[] = $row;
@@ -263,13 +263,13 @@ function cd_sunlight_log_summary() {
       $start = format_date($record->period . $seconds);
       $end = format_date(($record->period + 1) . $seconds);
       $row = array(
-        $start .' - '. $end,
+        $start . ' - ' . $end,
         $record->cnt,
       );
       $rows[] = $row;
     }
     $output .= theme('table', $header, $rows, array(),
-      t('Most active @seconds second period', array('@seconds' => number_format('1'. $seconds))));
+      t('Most active @seconds second period', array('@seconds' => number_format('1' . $seconds))));
   }
 
   return $output;
