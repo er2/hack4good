@@ -7,11 +7,13 @@
  */
 
 /**
- * Admin settings form.
+ * Form builder for admin settings form.
  *
  * @ingroup forms
+ *
+ * @see cd_sunlight_settings_form_validate()
  */
-function cd_sunlight_settings_form() {
+function cd_sunlight_settings_form($form, &$form_state) {
 
   $form['cd_sunlight_api_key'] = array(
     '#type' => 'textfield',
@@ -48,6 +50,13 @@ function cd_sunlight_settings_form() {
   return $form;
 }
 
+/**
+ * Form validator for admin settings form.
+ *
+ * @ingroup forms
+ *
+ * @see cd_sunlight_settings_form()
+ */
 function cd_sunlight_settings_form_validate($form, &$form_state) {
 
   // Temporarily replace the existing API key.
@@ -89,10 +98,10 @@ function cd_sunlight_settings_form_validate($form, &$form_state) {
  *
  * @ingroup forms
  */
-function cd_sunlight_batch_confirm() {
+function cd_sunlight_batch_confirm($form, &$form_state) {
   return confirm_form(array(),
     t('Process all contacts'),
-    'admin/settings/cd_sunlight',
+    'admin/config/services/cd_sunlight',
     t('Are you sure you want to process all contacts, queuing those that require a Congressional ' .
       'District? This action iterates through all contacts in CiviCRM, and may be a lengthy process.'),
     t('Process all contacts'),
@@ -102,6 +111,8 @@ function cd_sunlight_batch_confirm() {
 
 /**
  * Handler for batch confirmation.
+ *
+ * @see cd_sunlight_batch_finished()
  */
 function cd_sunlight_batch_confirm_submit($form, &$form_state) {
   $batch = array(
@@ -117,6 +128,11 @@ function cd_sunlight_batch_confirm_submit($form, &$form_state) {
   batch_set($batch);
 }
 
+/**
+ * Batch finished callback.
+ *
+ * @see cd_sunlight_batch_confirm_submit()
+ */
 function cd_sunlight_batch_finished($success, $results, $operations) {
   if ($success) {
     $message = format_plural($results, 'One contact processed.', '@count contacts processed.');
@@ -184,8 +200,8 @@ function cd_sunlight_log() {
   }
 
   // Create output;
-  $output = theme('table', $header, $rows);
-  $output .= theme('pager', array(), 50);
+  $output = theme('table', array('header' => $header, 'rows' => $rows));
+  $output .= theme('pager', array('quantity' => 50));
   return $output;
 }
 
@@ -196,12 +212,12 @@ function cd_sunlight_log_summary() {
   $output = '';
 
   // Totals.
-  $first_record = format_date(db_result(db_query('SELECT MIN(insert_time) FROM {cd_sunlight_cron}')));
-  $last_record = format_date(db_result(db_query('SELECT MAX(insert_time) FROM {cd_sunlight_cron}')));
+  $first_record = format_date(db_query('SELECT MIN(insert_time) FROM {cd_sunlight_cron}')->fetchField());
+  $last_record = format_date(db_query('SELECT MAX(insert_time) FROM {cd_sunlight_cron}')->fetchField());
   $output .= '<p>' . t('Log contains data from : %first_record to %last_record',
       array('%first_record' => $first_record, '%last_record' => $last_record)) . '</p>';
-  $total_unprocessed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0'));
-  $total_processed = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 1'));
+  $total_unprocessed = db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0')->fetchField();
+  $total_processed = db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 1')->fetchField();
   $output .= '<p>' . t('Total records in the queue: %count',
     array('%count' => number_format($total_processed + $total_unprocessed))) . '</p>';
   $output .= '<p>' . t('Total records that have been processed: %count',
@@ -224,7 +240,7 @@ function cd_sunlight_log_summary() {
     );
     $rows[] = $row;
   }
-  $output .= theme('table', $header, $rows, array(), t('Most active contacts'));
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'caption' => t('Most active contacts')));
 
   // Most common URIs.
   $header = array('URI', 'Count');
@@ -241,7 +257,7 @@ function cd_sunlight_log_summary() {
     );
     $rows[] = $row;
   }
-  $output .= theme('table', $header, $rows, array(), t('Most common URIs'));
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'caption' => t('Most common URIs')));
 
   // Most active periods of time.
   // 1NN seconds => left trim length of unix timestamp
@@ -268,8 +284,8 @@ function cd_sunlight_log_summary() {
       );
       $rows[] = $row;
     }
-    $output .= theme('table', $header, $rows, array(),
-      t('Most active @seconds second period', array('@seconds' => number_format('1' . $seconds))));
+    $output .= theme('table', array('header' => $header, 'rows' => $rows,
+      'caption' => t('Most active @seconds second period', array('@seconds' => number_format('1' . $seconds)))));
   }
 
   return $output;

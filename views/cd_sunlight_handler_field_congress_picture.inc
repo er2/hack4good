@@ -21,6 +21,7 @@ class cd_sunlight_handler_field_congress_picture extends views_handler_field {
 
   function options_form(&$form, &$form_state) {
     parent::options_form($form, $form_state);
+    // TODO: rework this imagecache thing.
     if (module_exists('imagecache')) {
       $formats = array('' => '- None -');
       foreach (imagecache_presets() as $preset) {
@@ -55,10 +56,12 @@ class cd_sunlight_handler_field_congress_picture extends views_handler_field {
 
     $image_url = cd_sunlight_bioguide_image_url($values->{$this->aliases['bioguide_id']});
     if (!empty($this->options['format']) && function_exists('theme_imagecache')) {
+      // TODO: rework this imagecache thing.
+      // TODO Please change this theme call to use an associative array for the $variables parameter.
       return theme('imagecache', $this->options['format'], $image_url);
     }
     else {
-      return theme('image', $image_url);
+      return theme('image', array('path' => $image_url));
     }
   }
 

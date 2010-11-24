@@ -14,7 +14,7 @@
  * @see cd_sunlight_search_form_validate()
  * @see cd_sunlight_search_form_submit()
  */
-function cd_sunlight_search_form(&$form_state, $zip = NULL, $state = NULL, $district = NULL) {
+function cd_sunlight_search_form($form, &$form_state, $zip = NULL, $state = NULL, $district = NULL) {
   $form['instructions'] = array(
     '#value' => t('Enter a zip code to find your members of Congress.'),
   );
@@ -101,6 +101,7 @@ function cd_sunlight_search_form_submit(&$form, &$form_state) {
   $district = $form_state['values']['cd']['district'];
 
   // Redisplay the form, with the results.
-  $form['#redirect'] = "congress-search/$zip/$state/$district";
+  // @todo Not sure that the hash is supposed to be there.
+  $form_state['#redirect'] = "congress-search/$zip/$state/$district";
 
 }

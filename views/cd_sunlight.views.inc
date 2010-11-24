@@ -7,7 +7,7 @@
  */
 
 /**
- * Implementation of hook_views_data().
+ * Implements hook_views_data().
  */
 function cd_sunlight_views_data() {
   $data['cd_sunlight_legislators']['table']['group'] = t('Congress');
@@ -267,7 +267,7 @@ function cd_sunlight_views_data() {
 }
 
 /**
- * Implementation of hook_views_handlers().
+ * Implements hook_views_handlers().
  */
 function cd_sunlight_views_handlers() {
   return array(

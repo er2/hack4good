@@ -17,27 +17,32 @@
  */
 
 /**
- * Implementation of hook_perm()
+ * Implements hook_permission().
  */
-function cd_sunlight_perm() {
-  return array('search congressional districts by zip');
+function cd_sunlight_permission() {
+  return array(
+    'search congressional districts by zip' => array(
+      'title' => t('search congressional districts by zip'),
+      'description' => t('TODO Add a description for \'search congressional districts by zip\''),
+    ),
+  );
 }
 
 /**
- * Implementation of hook_menu().
+ * Implements hook_menu().
  *
  * @ingroup hooks
  */
 function cd_sunlight_menu() {
   $items = array();
-  $items['admin/settings/cd_sunlight'] = array(
+  $items['admin/config/services/cd_sunlight'] = array(
     'title' => 'Sunlight congressional district',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('cd_sunlight_settings_form'),
     'access arguments' => array('administer site configuration'),
     'file' => 'cd_sunlight.admin.inc',
   );
-  $items['admin/settings/cd_sunlight/settings'] = array(
+  $items['admin/config/services/cd_sunlight/settings'] = array(
     'title' => 'Settings',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('cd_sunlight_settings_form'),
@@ -46,7 +51,7 @@ function cd_sunlight_menu() {
     'weight' => '0',
     'file' => 'cd_sunlight.admin.inc',
   );
-  $items['admin/settings/cd_sunlight/batch'] = array(
+  $items['admin/config/services/cd_sunlight/batch'] = array(
     'title' => 'Batch process',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('cd_sunlight_batch_confirm'),
@@ -96,32 +101,33 @@ function cd_sunlight_menu() {
 }
 
 /**
- * Implementation of hook_block()
+ * Implements hook_block_info().
  */
-function cd_sunlight_block($op = 'list', $delta = 0, $edit = array()) {
-  switch ($op) {
-    case 'list':
-      $blocks['congress_search'] = array(
-        'info' => t('Congress search by zip form'),
-        'cache' => BLOCK_CACHE_GLOBAL,
-        'pages' => 'congress-search',
-      );
-      return $blocks;
-    case 'view':
-      if ($delta == 'congress_search' && user_access('search congressional districts by zip')) {
-        module_load_include('pages.inc', 'cd_sunlight');
-        $block = array(
-          'subject' => t('Search for members of Congress'),
-          'content' => drupal_get_form('cd_sunlight_search_form'),
-        );
-        return $block;
-      }
-      break;
+function cd_sunlight_block_info() {
+  $blocks['congress_search'] = array(
+    'info' => t('Congress search by zip form'),
+    'cache' => BLOCK_CACHE_GLOBAL,
+    'pages' => 'congress-search',
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function cd_sunlight_block_view($delta) {
+  if ($delta == 'congress_search' && user_access('search congressional districts by zip')) {
+    module_load_include('pages.inc', 'cd_sunlight');
+    $block = array(
+      'subject' => t('Search for members of Congress'),
+      'content' => drupal_get_form('cd_sunlight_search_form'),
+    );
+    return $block;
   }
 }
 
 /**
- * Implementation of hook_form_alter()
+ * Implements hook_form_alter().
  */
 function cd_sunlight_form_alter(&$form, $form_state, $form_id) {
   if (
@@ -135,7 +141,7 @@ function cd_sunlight_form_alter(&$form, $form_state, $form_id) {
 }
 
 /**
- * Implementation of hook_cron().
+ * Implements hook_cron().
  *
  * @ingroup hooks
  */
@@ -172,14 +178,27 @@ function cd_sunlight_cron() {
   }
 
   // Cleanup old values from the cron table.
-  $max = db_result(db_query('SELECT MAX(cd_sunlight_cron_id) FROM {cd_sunlight_cron} WHERE processed = 1'));
-  db_query('DELETE FROM {cd_sunlight_cron} WHERE cd_sunlight_cron_id <= %d AND processed = 1',
-    $max - variable_get('dblog_row_limit', 1000));
+  // @see dblog_cron()
+  $row_limit = variable_get('dblog_row_limit', 1000);
+  if ($row_limit > 0) {
+    $min_row = db_select('cd_sunlight_cron', 'csc')
+      ->fields('csc', array('cd_sunlight_cron_id'))
+      ->orderBy('cd_sunlight_cron_id', 'DESC')
+      ->range($row_limit - 1, 1)
+      ->condition('processed', TRUE)
+      ->execute()->fetchField();
+    if ($min_row) {
+      db_delete('cd_sunlight_cron')
+      ->condition('cd_sunlight_cron_id', $min_row, '<')
+      ->condition('processed', TRUE)
+      ->execute();
+    }
+  }
 
 }
 
 /**
- * Implementation of hook_views_api().
+ * Implements hook_views_api().
  *
  * @ingroup hooks
  */
@@ -205,13 +224,13 @@ function cd_sunlight_views_api() {
 function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
 
   // If the contact is already queued, bail.
-  $already_queued = db_result(
-    db_query('SELECT 1 FROM {cd_sunlight_cron}
-      WHERE storage_system = "%s"
-        AND contact_id = %d
-        AND processed = 0',
-      $storage_system, $contact_id));
-  if ($already_queued) {
+  // @todo Not sure if this will work.  May need to use non-DBTNG.
+  $query = db_select('cd_sunlight_cron')
+    ->condition('storage_system', $storage_system)
+    ->condition('contact_id', $contact_id)
+    ->condition('processed', FALSE);
+  $query->addExpression('1');
+  if ($query->fetchField()) {
     if (variable_get('cd_sunlight_debug', FALSE)) {
       watchdog('cd_sunlight', 'Contact @contact_id re-queued before being processed.',
         array('@contact_id' => $contact_id), WATCHDOG_DEBUG);
@@ -220,13 +239,18 @@ function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
   }
 
   // Queue the contact.
-  $backtrace = '';
-  if (variable_get('cd_sunlight_debug', FALSE)) {
-    $backtrace = _cd_sunlight_backtrace();
-  }
-  db_query('INSERT IGNORE INTO {cd_sunlight_cron}
-    SET storage_system = "%s", contact_id = %d, request_uri = "%s", backtrace = "%s", insert_time = %d, processed = 0',
-    $storage_system, $contact_id, request_uri(), $backtrace, $_SERVER['REQUEST_TIME']);
+  // @todo This should be INSERT IGNORE to guard against race conditions, but I haven't
+  // figured out how to do that with DBTNG yet.
+  db_insert('cd_sunlight_cron')
+    ->fields(array(
+      'storage_system' => $storage_system,
+      'contact_id' => $contact_id,
+      'request_uri' => request_uri(),
+      'backtrace' => variable_get('cd_sunlight_debug', FALSE) ? _cd_sunlight_backtrace() : '',
+      'insert_time' => REQUEST_TIME,
+      'processed' => FALSE,
+    ))
+    ->execute();
 }
 
 /**
@@ -238,18 +262,21 @@ function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
  *  Conact ID for the given storage engine.
  */
 function cd_sunlight_contact_dequeue($storage_system, $contact_id) {
-  db_query('UPDATE {cd_sunlight_cron} SET processed = 1
-    WHERE storage_system = "%s"
-      AND contact_id = %d
-      AND processed = 0',
-    $storage_system, $contact_id);
+  db_update('cd_sunlight_cron')
+    ->fields(array('processed' => TRUE))
+    ->condition('storage_system', $storage_system)
+    ->condition('contact_id', $contact_id)
+    ->condition('processed', FALSE)
+    ->execute();
 
   // Clear any block cache for our views.
   $function = '_cd_' . $storage_system . 'contact_id_get_uid';
   if (db_table_exists('cache_block') && function_exists($function)) {
     $uid = $function($contact_id);
     // Can't use the API here because we need a wildcard in the middle.
-    db_query('DELETE FROM {cache_block} WHERE cid LIKE "%s"', 'views:Congress%:u.' . $uid);
+    db_delete('cache_block')
+      ->condition('cid', 'views:Congress%:u.' . $uid, 'LIKE')
+      ->execute();
   }
 }
 
@@ -600,26 +627,14 @@ function _cd_sunlight_validate_district($state, &$district) {
  *  );
  */
 function _cd_sunlight_legislator_delete($params) {
-
   if (empty($params) || !is_array($params)) {
     return FALSE;
   }
-
-  // Build WHERE.
-  $where = array();
+  $query = db_delete('cd_sunlight_legislators');
   foreach ($params as $field => &$value) {
-    if (is_string($value)) {
-      $where[] = db_escape_string($field) . ' = "%s"';
-    }
-    else {
-      $where[] = db_escape_string($field) . ' = %d';
-    }
+    $query->condition($field, $value);
   }
-  $where =  implode(' AND ', $where);
-
-  // Run Query.
-  $sql = 'DELETE FROM {cd_sunlight_legislators} WHERE ' . $where;
-  db_query($sql, $params);
+  $query->execute();
 }
 
 /**
@@ -817,7 +832,10 @@ function _cd_sunlight_sleep() {
  * @return boolean
  */
 function _cd_sunlight_legislators_exist() {
-  return (bool) db_result(db_query_range('SELECT 1 FROM {cd_sunlight_legislators}', 0, 1));
+  // TODO: Not sure if this works.  May need to do non DBTNG.
+  $query = db_select('cd_sunlight_legislators')->range(0, 1);
+  $query->addExpression('1');
+  return (bool) $query->fetchField();
 }
 
 /**
@@ -880,7 +898,7 @@ function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
   // Set in CiviCRM.
   if (function_exists('civicrm_initialize')) {
     civicrm_initialize();
-    require_once('CRM/Core/DAO.php');
+    require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'civicrm') . '/../CRM/Core/DAO.php';
     $params = array(1 => array($timeout, 'Integer'));
     CRM_Core_DAO::executeQuery('SET SESSION wait_timeout = %1', $params);
   }
@@ -942,7 +960,7 @@ function _cd_sunlight_remote_image_fetch($url) {
 function _cd_sunlight_is_url_an_image($url) {
 
   // Shorten the default timeout - we don't want the page to hang because we're waiting on favicons.
-  $response = drupal_http_request($url, array(), 'GET', NULL, 2, 4);
+  $response = drupal_http_request($url, array('max_redirects' => 2, 'timeout' => 4));
 
   // Is it a valid response?
   if ($response->code != 200 && $response->code != 301 || empty($response->data)) {
@@ -981,7 +999,7 @@ function _cd_sunlight_is_url_an_image($url) {
  */
 function _cd_sunlight_save_data_locally($data, $filename) {
   $directory = file_create_path('cd_sunlight');
-  file_check_directory($directory, FILE_CREATE_DIRECTORY);
+  file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
   $filename = $directory . '/' . $filename;
   return file_save_data($data, $filename, FILE_EXISTS_REPLACE);
 }

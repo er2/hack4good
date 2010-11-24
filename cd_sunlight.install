@@ -7,27 +7,27 @@
  */
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
 function cd_sunlight_schema() {
   $schema['cd_sunlight_cron'] = array(
-    'description' => t('Contains contact_ids that will be sent for CD Lookup on the next cron run.'),
+    'description' => 'Contains contact_ids that will be sent for CD Lookup on the next cron run.',
     'fields' => array(
       'cd_sunlight_cron_id' => array(
-        'description' => t('Autoincrementing primary key.'),
+        'description' => 'Autoincrementing primary key.',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
       'storage_system' => array(
-        'description' => t('Contact storage system.'),
+        'description' => 'Contact storage system.',
         'type' => 'varchar',
         'length' => 64,
         'not null' => TRUE,
         'default' => '',
       ),
       'contact_id' => array(
-        'description' => t('Contact ID.'),
+        'description' => 'Contact ID.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -45,14 +45,14 @@ function cd_sunlight_schema() {
         'description' => 'Optional backtrace. Only stored when debugging mode is enabled.',
       ),
       'insert_time' => array(
-        'description' => t('When this row was inserted.'),
+        'description' => 'When this row was inserted.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ),
       'processed' => array(
-        'description' => t('0 when the contact is first queued, set to 1 when dequeued.'),
+        'description' => '0 when the contact is first queued, set to 1 when dequeued.',
         'type' => 'int',
         'size' => 'tiny',
         'not null' => TRUE,
@@ -66,16 +66,16 @@ function cd_sunlight_schema() {
   );
 
   $schema['cd_sunlight_legislators'] = array(
-    'description' => t('The current members of Congress as returned by the Sunlight API.'),
+    'description' => 'The current members of Congress as returned by the Sunlight API.',
     'fields' => array(
       'legislator_id' => array(
-        'description' => t('Autoincrementing primary key.'),
+        'description' => 'Autoincrementing primary key.',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
       'last_update_time' => array(
-        'description' => t('When this row was last updated.'),
+        'description' => 'When this row was last updated.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -107,13 +107,13 @@ function cd_sunlight_schema() {
         'not null' => FALSE,
       ),
       'title' => array(
-        'description' => t('Either "Sen" or "Rep"'),
+        'description' => 'Either "Sen" or "Rep"',
         'type' => 'varchar',
         'length' => '3',
         'not null' => FALSE,
       ),
       'party' => array(
-        'description' => t('Either D, R, or I'),
+        'description' => 'Either D, R, or I',
         'type' => 'varchar',
         'length' => '1',
         'not null' => FALSE,
@@ -125,14 +125,14 @@ function cd_sunlight_schema() {
         'default' => '__',
       ),
       'district' => array(
-        'description' => t('Only for Reps.  The CD that they legislate.'),
+        'description' => 'Only for Reps.  The CD that they legislate.',
         'type' => 'int',
         'unsigned' => TRUE,
         'size' => 'tiny',
         'not null' => FALSE,
       ),
       'in_office' => array(
-        'description' => t('Is the legislator current.  Always 1 for our purposes.'),
+        'description' => 'Is the legislator current.  Always 1 for our purposes.',
         'type' => 'int',
         'size' => 'tiny',
         'not null' => TRUE,
@@ -174,68 +174,68 @@ function cd_sunlight_schema() {
         'not null' => FALSE,
       ),
       'bioguide_id' => array(
-        'description' => t('http://bioguide.congress.gov/'),
+        'description' => 'http://bioguide.congress.gov/',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'votesmart_id' => array(
-        'description' => t('http://votesmart.org/'),
+        'description' => 'http://votesmart.org/',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'fec_id' => array(
-        'description' => t('TODO'),
+        'description' => 'TODO',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'govtrack_id' => array(
-        'description' => t('http://govtrack.us/'),
+        'description' => 'http://govtrack.us/',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'crp_id' => array(
-        'description' => t('http://www.opensecrets.org/'),
+        'description' => 'http://www.opensecrets.org/',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'eventful_id' => array(
-        'description' => t('DEPRICATED'),
+        'description' => 'DEPRICATED',
         'type' => 'varchar',
         'length' => '32',
         'not null' => FALSE,
       ),
       'congresspedia_url' => array(
-        'description' => t('http://www.opencongress.org/'),
+        'description' => 'http://www.opencongress.org/',
         'type' => 'varchar',
         'length' => '64',
         'not null' => FALSE,
       ),
       'twitter_id' => array(
-        'description' => t('http://twitter.com/'),
+        'description' => 'http://twitter.com/',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
       ),
       'youtube_url' => array(
-        'description' => t('http://youtube.com/'),
+        'description' => 'http://youtube.com/',
         'type' => 'varchar',
         'length' => '64',
         'not null' => FALSE,
       ),
       'senate_class' => array(
-        'description' => t("For senators I, II, or III depending on the Senator's election term."),
+        'description' => "For senators I, II, or III depending on the Senator's election term.",
         'type' => 'varchar',
         'length' => '3',
         'not null' => TRUE,
         'default' => '',
       ),
       'birthdate' => array(
-        'description' => t("YYYY-MM-DD formatted birth date."),
+        'description' => "YYYY-MM-DD formatted birth date.",
         'type' => 'datetime',
         'not null' => FALSE,
       ),
@@ -254,7 +254,7 @@ function cd_sunlight_schema() {
 
 
 /**
- * Implementation of hook_requriements().
+ * Implements hook_requriements().
  */
 function cd_sunlight_requirements($phase) {
   global $db_prefix;
@@ -266,7 +266,7 @@ function cd_sunlight_requirements($phase) {
       $requirements['cd_sunlight_setup'] = array(
         'title' => 'CiviCRM Sunlight Congressional District',
         'description' => t('You have not <a href="!url">configured</a> the module.'
-          , array('!url' => url('admin/settings/cd_sunlight'))),
+          , array('!url' => url('admin/config/services/cd_sunlight'))),
         'severity' => REQUIREMENT_ERROR,
         'value' => t('Not configured'),
       );
@@ -281,7 +281,10 @@ function cd_sunlight_requirements($phase) {
     );
 
     // Report the number of records in the lookup queue.
-    $count = db_result(db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0'));
+    $query = db_select('cd_sunlight_cron')
+      ->condition('processed', FALSE);
+    $query->addExpression('COUNT(*)');
+    $count = $query->fetchField();
     $requirements['cd_sunlight_count'] = array(
       'title' => 'CiviCRM Sunlight Congressional District queue',
       'value' => t('There are !count contacts in the queue for a CD lookup.',
@@ -289,21 +292,6 @@ function cd_sunlight_requirements($phase) {
       'count' => $count,
       'severity' => REQUIREMENT_INFO,
     );
-
-    // Report the number of records in the batch geocoding queue.
-    if (variable_get('cd_sunlight_geocoding_off', FALSE) && db_table_exists('civicrm_address')) {
-      $count = db_result(db_query('SELECT COUNT(*) FROM {civicrm_address}
-        WHERE geo_code_1 IS NULL
-          AND country_id IS NOT NULL
-          AND state_province_id IS NOT NULL'));
-      $requirements['cd_sunlight_geocode_count'] = array(
-        'title' => 'CiviCRM Contact GeoCoding',
-        'value' => t('There are !count contacts in the queue to be geocoded.',
-          array('!count' => $count)),
-        'count' => $count,
-        'severity' => REQUIREMENT_INFO,
-      );
-    }
 
     // Report an error if there are no legislators (cron needs to be run).
     if (!_cd_sunlight_legislators_exist()) {
@@ -320,25 +308,11 @@ function cd_sunlight_requirements($phase) {
 }
 
 /**
- * Implementation of hook_install().
- *
- * @return none
- */
-function cd_sunlight_install() {
-  // Create tables.
-  drupal_install_schema('cd_sunlight');
-}
-
-/**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  *
  * @return none
  */
 function cd_sunlight_uninstall() {
-  // Remove tables.
-  drupal_uninstall_schema('cd_sunlight');
-
-  // Remove variables.
   variable_del('cd_sunlight_api_key');
   variable_del('cd_sunlight_cron_load_limit');
   variable_del('cd_sunlight_geocoding_off');
@@ -354,18 +328,9 @@ function cd_sunlight_uninstall() {
 }
 
 /**
- * Removed.
- */
-function cd_sunlight_update_4() {
-  $ret = array();
-  return $ret;
-}
-
-/**
  * Change our cron table to the new and improved version with more detailed logging.
  */
 function cd_sunlight_update_6001() {
-  $ret = array();
 
   // First get all the existing contact_ids.
   $res = db_query('SELECT contact_id FROM {cd_sunlight_cron}');
@@ -375,7 +340,7 @@ function cd_sunlight_update_6001() {
   }
 
   // Drop the old table.
-  db_drop_table($ret, 'cd_sunlight_cron');
+  db_drop_table('cd_sunlight_cron');
 
   // Recreate the table.
   $table = array(
@@ -425,21 +390,20 @@ function cd_sunlight_update_6001() {
       'cd_sunlight_cron_contact_id_processed_idx' => array('contact_id', 'processed'),
     ),
   );
-  db_create_table($ret, 'cd_sunlight_cron', $table);
+  db_create_table('cd_sunlight_cron', $table);
 
   // Requeue the contact_ids from the old table.
   foreach ($contact_ids as $contact_id) {
     cd_sunlight_contact_enqueue($contact_id);
   }
 
-  return $ret;
+  return t('Change {cd_sunlight_cron} table to the new and improved version with more detailed logging.');
 }
 
 /**
  * Update our schema with the new fields that Sunlight provides: senate_class and birthdate.
  */
 function cd_sunlight_update_6002() {
-  $return = array();
   $senate_class = array(
     'description' => t("For senators I, II, or III depending on the Senator's election term."),
     'type' => 'varchar',
@@ -447,25 +411,25 @@ function cd_sunlight_update_6002() {
     'not null' => TRUE,
     'default' => '',
   );
-  db_add_field($return, 'cd_sunlight_legislators', 'senate_class', $senate_class);
+  db_add_field('cd_sunlight_legislators', 'senate_class', $senate_class);
   $birthdate = array(
     'description' => t("YYYY-MM-DD formatted birth date."),
     'type' => 'datetime',
     'not null' => FALSE,
   );
-  db_add_field($return, 'cd_sunlight_legislators', 'birthdate', $birthdate);
-  return $return;
+  db_add_field('cd_sunlight_legislators', 'birthdate', $birthdate);
+  return t('Update {cd_sunlight_legislators} with the new fields that Sunlight provides: senate_class and birthdate.');
 }
 
 /**
  * Upgrade path for splitting the module.
  */
 function cd_sunlight_update_6003() {
-  $return = array();
 
   // Enable module.
-  module_rebuild_cache();
-  drupal_install_modules(array('cd_civicrm'));
+  system_rebuild_module_data();
+  module_enable(array('cd_civicrm'));
+
   $return[] = array(
     'success' => TRUE,
     'query' => 'Enabled CD CiviCRM module.',
@@ -479,10 +443,14 @@ function cd_sunlight_update_6003() {
     'not null' => TRUE,
     'default' => '',
   );
-  db_add_field($return, 'cd_sunlight_cron', 'storage_system', $storage_system);
+  db_add_field('cd_sunlight_cron', 'storage_system', $storage_system);
 
   // All contacts thus far must've been processed by CiviCRM.
-  db_query('UPDATE {cd_sunlight_cron} SET storage_system = "civicrm"');
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query('UPDATE {cd_sunlight_cron} SET storage_system = "civicrm"') */
+  db_update('cd_sunlight_cron')
+    ->fields(array('storage_system' => "civicrm"))
+    ->execute();
 
   // Variables.
   variable_set('cd_civicrm_cd', variable_get('cd_sunlight_civicrm_cd', ''));
@@ -515,7 +483,7 @@ function cd_sunlight_update_6003() {
     $return[] = array(
       'success' => FALSE,
       'query' => t('You must re set the <a href="!url">Advanced Batch Geocoding</a> settings as the encryption logic has changed.',
-              array('!url' => url('admin/settings/cd_sunlight'))),
+              array('!url' => url('admin/config/services/cd_sunlight'))),
     );
   }
 
@@ -524,5 +492,5 @@ function cd_sunlight_update_6003() {
   cache_clear_all('*', 'cache_menu', TRUE);
   menu_rebuild();
 
-  return $return;
+  return t('Split cd_sunlight module into cd_sunlight and cd_civicrm.');
 }

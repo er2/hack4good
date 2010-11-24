@@ -63,8 +63,8 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
 
       // Resolve favicons.
       if ($local_url = _cd_sunlight_remote_image_fetch($this->favicon_url)) {
-        $value = theme('image', $local_url, '',
-            $this->human_readable, array('height' => '16px', 'width' => '16px'), FALSE);
+        $value = theme('image', array('path' => $local_url, 'width' => '16', 'height' => '16',
+            'alt' => '', 'title' => $this->human_readable));
       }
 
     }
