@@ -160,7 +160,8 @@ function cd_sunlight_schema() {
       ),
       'webform' => array(
         'type' => 'varchar',
-        'length' => '64',
+        // TODO: write an update function for this.
+        'length' => '128',
         'not null' => FALSE,
       ),
       'email' => array(
@@ -236,7 +237,8 @@ function cd_sunlight_schema() {
       ),
       'birthdate' => array(
         'description' => "YYYY-MM-DD formatted birth date.",
-        'type' => 'datetime',
+        'mysql_type' => 'DATE',
+        'pgsql_type' => 'timestamp without time zone',
         'not null' => FALSE,
       ),
     ),
@@ -281,10 +283,8 @@ function cd_sunlight_requirements($phase) {
     );
 
     // Report the number of records in the lookup queue.
-    $query = db_select('cd_sunlight_cron')
-      ->condition('processed', FALSE);
-    $query->addExpression('COUNT(*)');
-    $count = $query->fetchField();
+    $query = db_select('cd_sunlight_cron')->condition('processed', FALSE);
+    $count = $query->countQuery()->execute()->fetchField();
     $requirements['cd_sunlight_count'] = array(
       'title' => 'CiviCRM Sunlight Congressional District queue',
       'value' => t('There are !count contacts in the queue for a CD lookup.',
@@ -397,7 +397,7 @@ function cd_sunlight_update_6001() {
     cd_sunlight_contact_enqueue($contact_id);
   }
 
-  return t('Change {cd_sunlight_cron} table to the new and improved version with more detailed logging.');
+  return t('Changed {cd_sunlight_cron} table to the new and improved version with more detailed logging.');
 }
 
 /**
@@ -414,11 +414,12 @@ function cd_sunlight_update_6002() {
   db_add_field('cd_sunlight_legislators', 'senate_class', $senate_class);
   $birthdate = array(
     'description' => t("YYYY-MM-DD formatted birth date."),
-    'type' => 'datetime',
+    'mysql_type' => 'DATE',
+    'pgsql_type' => 'timestamp without time zone',
     'not null' => FALSE,
   );
   db_add_field('cd_sunlight_legislators', 'birthdate', $birthdate);
-  return t('Update {cd_sunlight_legislators} with the new fields that Sunlight provides: senate_class and birthdate.');
+  return t('Updated {cd_sunlight_legislators} with the new fields that Sunlight provides: senate_class and birthdate.');
 }
 
 /**
@@ -446,8 +447,6 @@ function cd_sunlight_update_6003() {
   db_add_field('cd_sunlight_cron', 'storage_system', $storage_system);
 
   // All contacts thus far must've been processed by CiviCRM.
-  // TODO Please review the conversion of this statement to the D7 database API syntax.
-  /* db_query('UPDATE {cd_sunlight_cron} SET storage_system = "civicrm"') */
   db_update('cd_sunlight_cron')
     ->fields(array('storage_system' => "civicrm"))
     ->execute();

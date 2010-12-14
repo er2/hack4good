@@ -106,7 +106,7 @@ function cd_sunlight_menu() {
 function cd_sunlight_block_info() {
   $blocks['congress_search'] = array(
     'info' => t('Congress search by zip form'),
-    'cache' => BLOCK_CACHE_GLOBAL,
+    'cache' => DRUPAL_CACHE_GLOBAL,
     'pages' => 'congress-search',
   );
   return $blocks;
@@ -352,12 +352,9 @@ function cd_sunlight_api_lookup($method, $params, &$error_message = '') {
     return FALSE;
   }
 
-  // Convert params into a query string.
-  $params['apikey'] = variable_get('cd_sunlight_api_key', '');
-  $query = drupal_query_string_encode($params);
-
   // Call the URL and check for errors.
-  $url = url('http://services.sunlightlabs.com/api/' . $method . '.json', array('query' => $query));
+  $params['apikey'] = variable_get('cd_sunlight_api_key', '');
+  $url = url('http://services.sunlightlabs.com/api/' . $method . '.json', array('query' => $params));
   $response = drupal_http_request($url);
 
   // Increment our counter.
@@ -663,6 +660,7 @@ function _cd_sunlight_legislator_save($legislator) {
     return FALSE;
   }
 
+  // @todo remove this abomination.
   return (bool) drupal_write_record('cd_sunlight_legislators', $legislator);
 
 }
@@ -725,7 +723,7 @@ function _cd_sunlight_congress_update_all() {
   $params = array(
     'in_office' => TRUE,
   );
-  $query = drupal_query_string_encode($params);
+  $query = drupal_http_build_query($params);
   $legislators = _cd_sunlight_legislators_apilookup($params);
   if ($legislators === FALSE) {
     watchdog('cd_sunlight', 'Could not lookup legislators for %query',
@@ -832,10 +830,12 @@ function _cd_sunlight_sleep() {
  * @return boolean
  */
 function _cd_sunlight_legislators_exist() {
-  // TODO: Not sure if this works.  May need to do non DBTNG.
-  $query = db_select('cd_sunlight_legislators')->range(0, 1);
+  $query = db_select('cd_sunlight_legislators');
   $query->addExpression('1');
-  return (bool) $query->fetchField();
+  $result = $query->range(0, 1)
+    ->execute()
+    ->fetchField();
+  return !empty($result);
 }
 
 /**
@@ -885,14 +885,14 @@ function _cd_sunlight_mysql_wait_timeout($timeout = 900) {
     $old_db = db_set_active();
     foreach ($db_url as $db_name => $connection_string) {
       db_set_active($db_name);
-      db_query('SET SESSION wait_timeout = %d', $timeout);
+      db_query('SET SESSION wait_timeout = ' . (int) $timeout);
     }
     if ($old_db && $old_db != $db_name) {
       db_set_active($old_db);
     }
   }
   else {
-    db_query('SET SESSION wait_timeout = %d', $timeout);
+    db_query('SET SESSION wait_timeout = ' . (int) $timeout);
   }
 
   // Set in CiviCRM.
