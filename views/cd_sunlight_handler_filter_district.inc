@@ -17,6 +17,8 @@ class cd_sunlight_handler_filter_district extends views_handler_filter_many_to_o
 
   function query() {
     parent::query();
+    
+    // TODO: This is not working.
 
     // We need to move the district clause into its own WHERE group so that we can add an OR
     // for senators.

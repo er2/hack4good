@@ -18,8 +18,8 @@ function cd_sunlight_settings_form($form, &$form_state) {
   $form['cd_sunlight_api_key'] = array(
     '#type' => 'textfield',
     '#title' => t('Sunlight API Key'),
-    '#description' => t('A key can be obtained from <a href="!url">Sunlight Labs</a>.'
-      , array('!url' => url('http://services.sunlightlabs.com/api/'))),
+    '#description' => t('A key can be obtained from <a href="!url">Sunlight Labs</a>.',
+      array('!url' => 'http://services.sunlightlabs.com/api/')),
     '#default_value' => variable_get('cd_sunlight_api_key', ''),
     '#required' => TRUE,
   );

@@ -23,7 +23,7 @@ function cd_sunlight_permission() {
   return array(
     'search congressional districts by zip' => array(
       'title' => t('search congressional districts by zip'),
-      'description' => t('TODO Add a description for \'search congressional districts by zip\''),
+      'description' => t('Search congressional districts by zip.'),
     ),
   );
 }
@@ -224,13 +224,12 @@ function cd_sunlight_views_api() {
 function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
 
   // If the contact is already queued, bail.
-  // @todo Not sure if this will work.  May need to use non-DBTNG.
   $query = db_select('cd_sunlight_cron')
     ->condition('storage_system', $storage_system)
     ->condition('contact_id', $contact_id)
     ->condition('processed', FALSE);
   $query->addExpression('1');
-  if ($query->fetchField()) {
+  if ($query->execute()->fetchField()) {
     if (variable_get('cd_sunlight_debug', FALSE)) {
       watchdog('cd_sunlight', 'Contact @contact_id re-queued before being processed.',
         array('@contact_id' => $contact_id), WATCHDOG_DEBUG);
@@ -248,7 +247,7 @@ function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
       'request_uri' => request_uri(),
       'backtrace' => variable_get('cd_sunlight_debug', FALSE) ? _cd_sunlight_backtrace() : '',
       'insert_time' => REQUEST_TIME,
-      'processed' => FALSE,
+      'processed' => 0,
     ))
     ->execute();
 }
@@ -651,18 +650,8 @@ function _cd_sunlight_legislator_delete($params) {
  * @return boolean
  *  TRUE on success, else FALSE.
  */
-function _cd_sunlight_legislator_save($legislator) {
-
-  // Sanity Checking.
-  if (empty($legislator) || !is_array($legislator)) {
-    watchdog('cd_sunlight', 'Improper parameters for _cd_sunlight_legislator_save().', array(),
-      WATCHDOG_ERROR);
-    return FALSE;
-  }
-
-  // @todo remove this abomination.
+function _cd_sunlight_legislator_save(array $legislator) {
   return (bool) drupal_write_record('cd_sunlight_legislators', $legislator);
-
 }
 
 /**
@@ -998,8 +987,9 @@ function _cd_sunlight_is_url_an_image($url) {
  *  the path of the local file (relative to the Drupal files directory). Or 0 on error.
  */
 function _cd_sunlight_save_data_locally($data, $filename) {
-  $directory = file_create_path('cd_sunlight');
-  file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
-  $filename = $directory . '/' . $filename;
-  return file_save_data($data, $filename, FILE_EXISTS_REPLACE);
+  $directory = 'public://cd_sunlight';
+  if (!file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS)) {
+    return 0;
+  }
+  return file_unmanaged_save_data($data, $directory . '/' . $filename, FILE_EXISTS_REPLACE);
 }

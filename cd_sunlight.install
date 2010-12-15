@@ -160,8 +160,7 @@ function cd_sunlight_schema() {
       ),
       'webform' => array(
         'type' => 'varchar',
-        // TODO: write an update function for this.
-        'length' => '128',
+        'length' => '255',
         'not null' => FALSE,
       ),
       'email' => array(
@@ -492,4 +491,18 @@ function cd_sunlight_update_6003() {
   menu_rebuild();
 
   return t('Split cd_sunlight module into cd_sunlight and cd_civicrm.');
+}
+
+/**
+ * Increase the length of the webform field.
+ */
+function cd_sunlight_update_6004() {
+  $webform = array(
+    'type' => 'varchar',
+    'length' => '255',
+    'not null' => FALSE,
+  );
+
+  db_change_field('cd_sunlight_legislators', 'webform', 'webform', $webform);
+  return t('Increased length of webform field.');
 }

@@ -16,16 +16,16 @@
  */
 function cd_sunlight_search_form($form, &$form_state, $zip = NULL, $state = NULL, $district = NULL) {
   $form['instructions'] = array(
-    '#value' => t('Enter a zip code to find your members of Congress.'),
+    '#markup' => t('Enter a zip code to find your members of Congress.'),
   );
 
   // Do we have access to the Congress page view.
   $congress_path = menu_get_item('congress');
   if (!empty($congress_path['access'])) {
-    $form['instructions']['#value'] .= ' ' .
+    $form['instructions']['#markup'] .= ' ' .
       t('Or <a href="!url">browse all members of Congress</a>.', array('!url' => url('congress')));
   }
-  $form['instructions']['#value'] = '<p>' . $form['instructions']['#value'] . '</p>';
+  $form['instructions']['#markup'] = '<p>' . $form['instructions']['#markup'] . '</p>';
 
   $form['zip'] = array(
     '#title' => t('Zip Code (five digits)'),
@@ -50,7 +50,7 @@ function cd_sunlight_search_form($form, &$form_state, $zip = NULL, $state = NULL
       views_embed_view('congress', 'default', $state, $district);
 
     // The more link is retaining the arguments.  Get rid of them.
-    $form['results']['#value'] = preg_replace('!/congress.*?"!', '/congress"', $results);
+    $form['results']['#markup'] = preg_replace('!/congress.*?"!', '/congress"', $results);
   }
 
   return $form;
