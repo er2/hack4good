@@ -103,7 +103,7 @@ function cd_sunlight_batch_confirm($form, &$form_state) {
     t('Process all contacts'),
     'admin/config/services/cd_sunlight',
     t('Are you sure you want to process all contacts, queuing those that require a Congressional ' .
-      'District? This action iterates through all contacts in CiviCRM, and may be a lengthy process.'),
+      'District? This action iterates through all contacts, and may be a lengthy process.'),
     t('Process all contacts'),
     t('Cancel')
   );
@@ -121,6 +121,7 @@ function cd_sunlight_batch_confirm_submit($form, &$form_state) {
     'init_message' => t('Starting.'),
     'error_message' => t('An error occurred and some contacts have not been processed.'),
     'file' => drupal_get_path('module', 'cd_sunlight') . '/cd_sunlight.admin.inc',
+    'operations' => array(),
   );
   if (function_exists('_cd_civicrm_batch')) {
     $batch['operations'][] = array('_cd_civicrm_batch', array());
@@ -135,7 +136,12 @@ function cd_sunlight_batch_confirm_submit($form, &$form_state) {
  */
 function cd_sunlight_batch_finished($success, $results, $operations) {
   if ($success) {
-    $message = format_plural($results, 'One contact processed.', '@count contacts processed.');
+    if ($results) {
+      $message = format_plural($results, 'One contact processed.', '@count contacts processed.');
+    }
+    else {
+      $message = t('No contacts to process.');
+    }
   }
   else {
     $message = t('Finished with an error.');
@@ -176,8 +182,15 @@ function cd_sunlight_log() {
   }
 
   // Build data.
-  $res = pager_query('SELECT * FROM {cd_sunlight_cron} ' . tablesort_sql($header), 50);
-  while ($record = db_fetch_object($res)) {
+  $query = db_select('cd_sunlight_cron', 'csc', array('target' => 'slave'))
+    ->extend('PagerDefault')
+    ->extend('TableSort');
+  $query->fields('csc');
+  $query->orderByHeader($header)
+    ->limit(50);
+  $records = $query->execute();
+
+  foreach ($records as $record) {
 
     // Get a link to the contact.
     $contact_link = $record->contact_id;
@@ -189,6 +202,7 @@ function cd_sunlight_log() {
     // Build row.
     $row = array(
       format_date($record->insert_time),
+      $record->storage_system,
       $contact_link,
       $record->processed,
       check_plain($record->request_uri),
@@ -212,12 +226,20 @@ function cd_sunlight_log_summary() {
   $output = '';
 
   // Totals.
-  $first_record = format_date(db_query('SELECT MIN(insert_time) FROM {cd_sunlight_cron}')->fetchField());
-  $last_record = format_date(db_query('SELECT MAX(insert_time) FROM {cd_sunlight_cron}')->fetchField());
+  $query = db_select('cd_sunlight_cron');
+  $query->addExpression('MIN(insert_time)');
+  $first_record = format_date($query->execute()->fetchField());
+  $query = db_select('cd_sunlight_cron');
+  $query->addExpression('MAX(insert_time)');
+  $last_record = format_date($query->execute()->fetchField());
   $output .= '<p>' . t('Log contains data from : %first_record to %last_record',
       array('%first_record' => $first_record, '%last_record' => $last_record)) . '</p>';
-  $total_unprocessed = db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 0')->fetchField();
-  $total_processed = db_query('SELECT COUNT(*) FROM {cd_sunlight_cron} WHERE processed = 1')->fetchField();
+  $query = db_select('cd_sunlight_cron')->condition('processed', 0);
+  $query->addExpression('COUNT(*)');
+  $total_unprocessed = $query->execute()->fetchField();
+  $query = db_select('cd_sunlight_cron')->condition('processed', 1);
+  $query->addExpression('COUNT(*)');
+  $total_processed = $query->execute()->fetchField();
   $output .= '<p>' . t('Total records in the queue: %count',
     array('%count' => number_format($total_processed + $total_unprocessed))) . '</p>';
   $output .= '<p>' . t('Total records that have been processed: %count',
@@ -225,37 +247,39 @@ function cd_sunlight_log_summary() {
   $output .= '<p>' . t('Total records that have not been processed: %count',
     array('%count' => number_format($total_unprocessed))) . '</p>';
 
-  // Most common contacts.
+  // Most active contacts.
   $header = array('Contact', 'Count');
   $rows = array();
-  $result = db_query('SELECT contact_id, COUNT(*) AS cnt
-    FROM {cd_sunlight_cron}
-    GROUP BY contact_id
-    ORDER BY cnt DESC
-    LIMIT 10');
-  while ($record = db_fetch_object($result)) {
-    $row = array(
-      l($record->contact_id, 'civicrm/contact/view', array('query' => 'reset=1&cid=' . $record->contact_id)),
-      $record->cnt,
-    );
-    $rows[] = $row;
+  $query = db_select('cd_sunlight_cron', 'csc')
+    ->fields('csc', array('contact_id', 'storage_system'));
+  $count_alias = $query->addExpression('COUNT(*)', 'cnt');
+  $records = $query->groupBy('contact_id')
+    ->groupBy('storage_system')
+    ->orderBy($count_alias, 'DESC')
+    ->range(0, 10)
+    ->execute();
+  foreach ($records as $record) {
+    $contact_link = $record->contact_id;
+    $function = 'cd_' . $record->storage_system . '_contact_link';
+    if (function_exists($function)) {
+      $contact_link = $function($record->contact_id, $record->contact_id);
+    }
+    $rows[] = array($contact_link, $record->$count_alias);
   }
   $output .= theme('table', array('header' => $header, 'rows' => $rows, 'caption' => t('Most active contacts')));
 
   // Most common URIs.
   $header = array('URI', 'Count');
   $rows = array();
-  $result = db_query('SELECT request_uri, COUNT(*) AS cnt
-    FROM {cd_sunlight_cron}
-    GROUP BY request_uri
-    ORDER BY cnt DESC
-    LIMIT 10');
-  while ($record = db_fetch_object($result)) {
-    $row = array(
-      $record->request_uri,
-      $record->cnt,
-    );
-    $rows[] = $row;
+  $query = db_select('cd_sunlight_cron', 'csc')
+    ->fields('csc', array('request_uri'));
+  $count_alias = $query->addExpression('COUNT(*)', 'cnt');
+  $records = $query->groupBy('request_uri')
+    ->orderBy($count_alias, 'DESC')
+    ->range(0, 10)
+    ->execute();
+  foreach ($records as $record) {
+    $rows[] = array($record->request_uri, $record->$count_alias);
   }
   $output .= theme('table', array('header' => $header, 'rows' => $rows, 'caption' => t('Most common URIs')));
 
@@ -270,17 +294,19 @@ function cd_sunlight_log_summary() {
   foreach ($time_periods as $seconds => $left_trim) {
     $header = array('Period', 'Queued contacts');
     $rows = array();
-    $result = db_query('SELECT LEFT(insert_time, %d) AS period, COUNT(*) AS cnt
-      FROM {cd_sunlight_cron}
-      GROUP BY period
-      ORDER BY cnt DESC
-      LIMIT 10', $left_trim);
-    while ($record = db_fetch_object($result)) {
-      $start = format_date($record->period . $seconds);
-      $end = format_date(($record->period + 1) . $seconds);
+    $query = db_select('cd_sunlight_cron', 'csc');
+    $period_alias = $query->addExpression('LEFT(insert_time, :left_trim)', 'period', array(':left_trim' => $left_trim));
+    $count_alias = $query->addExpression('COUNT(*)', 'cnt');
+    $records = $query->groupBy($period_alias)
+      ->orderBy($count_alias, 'DESC')
+      ->range(0, 10)
+      ->execute();
+    foreach ($records as $record) {
+      $start = format_date($record->$period_alias . $seconds);
+      $end = format_date(($record->$period_alias + 1) . $seconds);
       $row = array(
         $start . ' - ' . $end,
-        $record->cnt,
+        $record->$count_alias,
       );
       $rows[] = $row;
     }
