@@ -858,7 +858,7 @@ function _cd_sunlight_backtrace() {
 }
 
 /**
- * Reconnect to DBs if necessary.
+ * Increase MySQL timeouts.
  *
  * Use this if you are running into "MySQL has gone away" errors.  These can happen especially
  * during cron and anything else that takes more than 90 seconds.

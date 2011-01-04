@@ -265,7 +265,7 @@ function cd_sunlight_requirements($phase) {
     // Raise an error if a the module has not been setup.
     if (!variable_get('cd_sunlight_api_key', '')) {
       $requirements['cd_sunlight_setup'] = array(
-        'title' => 'CiviCRM Sunlight Congressional District',
+        'title' => 'Sunlight Congressional District',
         'description' => t('You have not <a href="!url">configured</a> the module.'
           , array('!url' => url('admin/config/services/cd_sunlight'))),
         'severity' => REQUIREMENT_ERROR,
@@ -275,7 +275,7 @@ function cd_sunlight_requirements($phase) {
 
     // Report the number of lookups ever performed.
     $requirements['cd_sunlight_total_lookups'] = array(
-      'title' => 'CiviCRM Sunlight Congressional District lookups',
+      'title' => 'Sunlight Congressional District lookups',
       'value' => t('A total of !count lookups to Sunlight have been performed.',
         array('!count' => number_format(variable_get('cd_sunlight_total_lookups', 0)))),
       'severity' => REQUIREMENT_INFO,

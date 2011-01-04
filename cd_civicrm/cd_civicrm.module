@@ -615,7 +615,9 @@ function _cd_civicrm_contacts_geocode() {
     $query_string = drupal_query_string_encode($query);
     $url = url($script, array('query' => $query_string, 'absolute' => TRUE));
     watchdog('cd_civicrm', 'Error during contact geocoding: @error', array(
-      '@error' => $response->code . ': ' . $response->error . ': ' . $url . '; ' . $response->data,
+      '@error' => $response->code . ': ' .
+        (isset($response->error) ? $response->error : '') . ': ' .
+        $url . '; ' . $response->data,
     ),
       WATCHDOG_ERROR
     );

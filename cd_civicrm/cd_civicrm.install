@@ -44,7 +44,7 @@ function cd_civicrm_requirements($phase) {
       }
     }
     $requirements['cd_civicrm_db'] = array(
-      'title' => 'CD CiviCRM',
+      'title' => 'CiviCRM Congressional District',
       'description' => t('In %settings $db_prefix must be an array and you must have prefixes ' .
         'for the following tables: %tables.  See the <a href="!url">CiviCRM Views Integration</a> ' .
         'for more info.',
@@ -75,7 +75,7 @@ function cd_civicrm_requirements($phase) {
       !variable_get('cd_civicrm_cd_override', '')
     ) {
       $requirements['cd_civicrm_fields'] = array(
-        'title' => 'CD CiviCRM fields',
+        'title' => 'CiviCRM Congressional District fields',
         'description' => t('You have not <a href="!url">chosen storage fields</a> for CiviCRM data.'
           , array('!url' => url('admin/settings/cd_sunlight/cd_civicrm'))),
         'severity' => REQUIREMENT_ERROR,
@@ -84,13 +84,13 @@ function cd_civicrm_requirements($phase) {
     }
 
     // Report the number of records in the batch geocoding queue.
-    if (variable_get('cd_civicrm_geocoding_off', FALSE) && db_table_exists('civicrm_address')) {
+    if (variable_get('cd_civicrm_geocoding_off', FALSE)) {
       $count = db_result(db_query('SELECT COUNT(*) FROM {civicrm_address}
         WHERE geo_code_1 IS NULL
           AND country_id IS NOT NULL
           AND state_province_id IS NOT NULL'));
       $requirements['cd_civicrm_geocode_count'] = array(
-        'title' => 'CiviCRM Contact GeoCoding',
+        'title' => 'CiviCRM Congressional District contact geocoding',
         'value' => t('There are roughly !count contacts in the queue to be geocoded.',
           array('!count' => $count)),
         'count' => $count,
