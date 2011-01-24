@@ -101,7 +101,6 @@ function cd_sunlight_search_form_submit(&$form, &$form_state) {
   $district = $form_state['values']['cd']['district'];
 
   // Redisplay the form, with the results.
-  // @todo Not sure that the hash is supposed to be there.
-  $form_state['#redirect'] = "congress-search/$zip/$state/$district";
+  $form_state['redirect'] = "congress-search/$zip/$state/$district";
 
 }

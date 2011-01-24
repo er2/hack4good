@@ -8,6 +8,8 @@
 
 /**
  * Implements hook_views_data().
+ *
+ * @todo Why isn't help working?
  */
 function cd_sunlight_views_data() {
   $data['cd_sunlight_legislators']['table']['group'] = t('Congress');
@@ -18,6 +20,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['firstname'] = array(
     'title' => t('First Name'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -25,6 +28,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['middlename'] = array(
     'title' => t('Middle Name'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -32,6 +36,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['lastname'] = array(
     'title' => t('Last Name'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -39,6 +44,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['name_suffix'] = array(
     'title' => t('Name Suffix'),
+    'help' => t('"Jr." for example.'),
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -46,6 +52,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['nickname'] = array(
     'title' => t('Nickname'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'cd_sunlight_handler_field_nickname',
       'click sortable' => TRUE,
@@ -80,6 +87,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['party'] = array(
     'title' => t('Party'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'cd_sunlight_handler_field_party',
       'click sortable' => TRUE,
@@ -97,6 +105,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['state'] = array(
     'title' => t('State'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -114,6 +123,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['district'] = array(
     'title' => t('District'),
+    'help' => t('District number.'),
     'field' => array(
       'handler' => 'views_handler_field_numeric',
       'click sortable' => TRUE,
@@ -124,6 +134,7 @@ function cd_sunlight_views_data() {
     ),
     'filter' => array(
       'handler' => 'cd_sunlight_handler_filter_district',
+      'help' => t('Not useful unless used in combination with the state filter.'),
     ),
     'sort' => array(
       'handler' => 'views_handler_sort',
@@ -131,6 +142,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['gender'] = array(
     'title' => t('Gender'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -145,6 +157,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['phone'] = array(
     'title' => t('Phone'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -152,6 +165,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['fax'] = array(
     'title' => t('Fax'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -159,6 +173,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['website'] = array(
     'title' => t('Website'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'cd_sunlight_handler_field_url_favicon_website',
       'click sortable' => TRUE,
@@ -166,6 +181,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['webform'] = array(
     'title' => t('Webform'),
+    'help' => t("URL of the congress person's web-based contact form."),
     'field' => array(
       'handler' => 'cd_sunlight_handler_field_url_favicon_webform',
       'click sortable' => TRUE,
@@ -173,6 +189,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['email'] = array(
     'title' => t('Email'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'cd_sunlight_handler_field_url',
       'click sortable' => TRUE,
@@ -180,6 +197,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['congress_office'] = array(
     'title' => t('Congress Office'),
+    'help' => 'Office address',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -203,6 +221,7 @@ function cd_sunlight_views_data() {
   );
   $data['cd_sunlight_legislators']['fec_id'] = array(
     'title' => t('FEC ID'),
+    'help' => ' ',
     'field' => array(
       'handler' => 'views_handler_field',
       'click sortable' => TRUE,
@@ -249,16 +268,16 @@ function cd_sunlight_views_data() {
     ),
   );
   $data['cd_sunlight_legislators']['picture'] = array(
+    'title' => t('Picture'),
+    'help' => t('Profile picture.'),
     'field' => array(
-      'title' => t('Picture'),
-      'help' => t('Profile picture.'),
       'handler' => 'cd_sunlight_handler_field_congress_picture',
     ),
   );
   $data['cd_sunlight_legislators']['progressive_punch'] = array(
+    'title' => t('Progressive Punch Page'),
+    'help' => t('http://progressivepunch.org'),
     'field' => array(
-      'title' => t('Progressive Punch Page'),
-      'help' => t('http://progressivepunch.org'),
       'handler' => 'cd_sunlight_handler_field_url_favicon_progressive_punch',
     ),
   );
@@ -352,10 +371,10 @@ function cd_sunlight_views_handlers() {
         'parent' => 'views_handler_filter_in_operator',
       ),
       'cd_sunlight_handler_filter_state' => array(
-        'parent' => 'views_handler_filter_many_to_one',
+        'parent' => 'views_handler_filter_in_operator',
       ),
       'cd_sunlight_handler_filter_district' => array(
-        'parent' => 'views_handler_filter_many_to_one',
+        'parent' => 'views_handler_filter_in_operator',
       ),
 
       // Arguments.

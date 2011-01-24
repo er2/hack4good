@@ -9,31 +9,27 @@ class cd_sunlight_handler_argument_district extends views_handler_argument_numer
   function query() {
     parent::query();
 
-    // We need to move the district clause into its own WHERE group so that we can add an OR
-    // for senators.
-    foreach ($this->query->where[0]['clauses'] as $clause_id => $clause) {
-      if (strpos($clause, '.district ') !== FALSE) {
-        $district_clause_id = $clause_id;
+    // Add senators to the district condition.
+    // First find the district condition.
+    foreach ($this->query->where[0]['conditions'] as $clause_id => $clause) {
+      if (strpos($clause['field'], '.district') !== FALSE) {
+
+        // Remove the old clause.
+        $field = $this->query->where[0]['conditions'][$clause_id]['field'];
+        $districts = $this->query->where[0]['conditions'][$clause_id]['value'];
+        unset($this->query->where[0]['conditions'][$clause_id]);
+
+        if (!is_array($districts)) {
+          // This happens if condition was "WHERE district = N";
+          $districts = array($districts);
+        }
+        $districts[] = 0;
+
+        // Add a new group.
+        $this->query->add_where($clause_id, $field, $districts, 'IN');
+
         break;
       }
-    }
-
-    // Add our new WHERE group.
-    if (!empty($district_clause_id)) {
-
-      // Remove the old clause.
-      $district = $this->query->where[0]['args'][$district_clause_id];
-      $where = $this->query->where[0]['clauses'][$district_clause_id];
-      unset($this->query->where[0]['clauses'][$district_clause_id],
-        $this->query->where[0]['args'][$district_clause_id]);
-
-      // Add a new group.
-      $group = $this->query->set_where_group('OR');
-      $this->query->add_where($group, $where, $district);
-
-      // Also show senators for this CD.
-      $this->query->add_where($group, "$this->table_alias.$this->real_field = 0");
-
     }
 
   }

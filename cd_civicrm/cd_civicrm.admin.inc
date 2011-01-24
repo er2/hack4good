@@ -252,7 +252,7 @@ function cd_civicrm_settings_fields_form_submit($form, &$form_state) {
   // Save the variables.
   variable_set('cd_civicrm_custom_table',
     $field_cd_civicrm_cd->table_name);
-  variable_set('cd_civicrm_civicrm_cd',
+  variable_set('cd_civicrm_cd',
     'custom_' . $field_cd_civicrm_cd->id);
   variable_set('cd_civicrm_cd_override',
     'custom_' . $field_cd_civicrm_cd_override->id);

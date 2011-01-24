@@ -285,7 +285,7 @@ function cd_sunlight_requirements($phase) {
     $query = db_select('cd_sunlight_cron')->condition('processed', FALSE);
     $count = $query->countQuery()->execute()->fetchField();
     $requirements['cd_sunlight_count'] = array(
-      'title' => 'CiviCRM Sunlight Congressional District queue',
+      'title' => 'Sunlight Congressional District queue',
       'value' => t('There are !count contacts in the queue for a CD lookup.',
         array('!count' => $count)),
       'count' => $count,

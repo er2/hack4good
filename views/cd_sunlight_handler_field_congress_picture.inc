@@ -55,7 +55,7 @@ class cd_sunlight_handler_field_congress_picture extends views_handler_field {
     }
 
     $image_url = cd_sunlight_bioguide_image_url($values->{$this->aliases['bioguide_id']});
-    if (!empty($this->options['format']) && function_exists('theme_imagecache')) {
+    if (!empty($this->options['format']) && function_exists('theme_imagecache') && strpos($image_url, 'http') !== 0) {
       // TODO: rework this imagecache thing.
       // TODO Please change this theme call to use an associative array for the $variables parameter.
       return theme('imagecache', $this->options['format'], $image_url);

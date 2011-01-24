@@ -297,7 +297,7 @@ function cd_civicrm_civicrm_post($op, $object_type, $contact_id, $ref) {
           array('@contact_id' => $contact_id), WATCHDOG_DEBUG);
       }
       $cd = _cd_civicrm_contact_cd_update($contact_id);
-      if ($cd === FALSE) {
+      if (!$cd || $cd == 'not found') {
         drupal_set_message('Unfortunately we were not able to determine your congressional district.', 'error');
       }
     }
@@ -783,9 +783,9 @@ function _cd_civicrm_api_lookup_contact($contact) {
  * @param int $contact_id.
  *
  * @return mixed
- *  FALSE if there was an error or if the CD could not be found.
+ *  FALSE if there was an error.
  *  NULL if there was not enough contact data to perform a lookup.
- *  Else the CD returned by Sunlight ex. 'NY17'.
+ *  Else the string CD returned by Sunlight ex. 'NY17', or 'not found'.
  */
 function _cd_civicrm_contact_cd_update($contact_id) {
   $contact_link = cd_civicrm_contact_link('view', $contact_id);
@@ -806,7 +806,7 @@ function _cd_civicrm_contact_cd_update($contact_id) {
   if (civicrm_error($contact)) {
     watchdog('cd_civicrm', 'Error loading contact in _cd_civicrm_contact_cd_update()', array(),
       WATCHDOG_ERROR, $contact_link);
-    return array();
+    return FALSE;
   }
 
   // Get the data from Sunlight.
@@ -829,7 +829,7 @@ function _cd_civicrm_contact_cd_update($contact_id) {
     }
     else {
       cd_sunlight_contact_dequeue('civicrm', $contact_id);
-      return FALSE;
+      return 'not found';
     }
   }
   else {
