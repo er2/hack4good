@@ -83,7 +83,7 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
       if (!empty($this->options['new_window'])) {
         $l_options['attributes']['target'] = '_blank';
       }
-      return l('<span>' . $value . '</span>', $this->url_path . $this->url_query, $l_options);
+      return l('<span>' . $value . '</span>', $this->url_path . ($this->url_query ? '?' : '') . $this->url_query, $l_options);
     }
     else {
       return '<span class="' . $class . '">' . check_plain($this->url_path . ($this->url_query ? '?' : '') . $this->url_query) . '</span>';
@@ -298,7 +298,7 @@ class cd_sunlight_handler_field_url_favicon_progressive_punch extends cd_sunligh
   function render($values) {
     $this->favicon_url = 'http://progressivepunch.org/images/boxer_l2.jpg';
     $this->human_readable = 'Progressive Punch';
-    $this->url_path = 'http://progressivepunch.org/members.jsp';
+    $this->url_path = 'http://progressivepunch.org/members.htm';
 
     // Their URL structure sucks!  For reps it's fairly easy.
     // For sens we need to use a more general call.
