@@ -93,6 +93,67 @@ class cd_sunlight_handler_field_url_favicon extends views_handler_field_url {
 }
 
 /**
+ * Field handler to provide favicon for Facebook_ID.
+ *
+ * @ingroup views_field_handlers
+ */
+class cd_sunlight_handler_field_url_favicon_facebook extends cd_sunlight_handler_field_url_favicon {
+
+  function option_definition() {
+    $options = parent::option_definition();
+    $options['facebook_url'] = array('default' => 'profile');
+    return $options;
+  }
+
+  function options_form(&$form, &$form_state) {
+    parent::options_form($form, $form_state);
+    $form['facebook_url'] = array(
+      '#title' => t('URL type'),
+      '#type' => 'radios',
+      '#default_value' => $this->options['facebook_url'],
+      '#options' => array(
+        'profile' => 'Profile page',
+        'graph' => 'Facebook graph endpoint',
+      )
+    );
+  }
+
+  function render($values) {
+    if ($facebook_id = $values->{$this->field_alias}) {
+      $this->favicon_url = 'http://www.facebook.com/favicon.ico';
+      $this->human_readable = 'Facebook';
+      $this->url_query = NULL;
+
+      switch ($this->options['facebook_url']) {
+        case 'graph':
+          $this->url_path = 'http://graph.facebook.com/'. $facebook_id;
+          break;
+        default:
+          if (is_numeric($facebook_id)) {
+            // In this case we _should_ be fetching the real URL using the FB graph endpoint.
+            // It will return something like the following:
+            //  http://www.facebook.com/pages/Congressman-Robert-Brady/118845109487
+            // But that's onerous and a simple workaround exists.  Any of the following
+            // currently works:
+            //  http://www.facebook.com/pages/Robert-Brady/118845109487
+            //  http://www.facebook.com/pages/brady/118845109487
+            //  http://www.facebook.com/pages/foo/118845109487
+            // Though FB could change that at any time.
+            $this->url_path = 'http://www.facebook.com/pages/page/'. $facebook_id;
+          }
+          else {
+            $this->url_path = 'http://www.facebook.com/'. $facebook_id;
+          }
+          break;
+      }
+
+    }
+    return parent::render($values);
+  }
+
+}
+
+/**
  * Field handler to provide favicon for YouTube URL.
  *
  * @ingroup views_field_handlers

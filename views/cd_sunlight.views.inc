@@ -267,6 +267,15 @@ function cd_sunlight_views_data() {
       'click sortable' => TRUE,
     ),
   );
+  $data['cd_sunlight_legislators']['facebook_url'] = array(
+    'real field' => 'facebook_id',
+    'title' => t('Facebook URL'),
+    'help' => t('http://www.facebook.com/'),
+    'field' => array(
+      'handler' => 'cd_sunlight_handler_field_url_favicon_facebook',
+      'click sortable' => TRUE,
+    ),
+  );
   $data['cd_sunlight_legislators']['picture'] = array(
     'title' => t('Picture'),
     'help' => t('Profile picture.'),
@@ -313,6 +322,10 @@ function cd_sunlight_views_handlers() {
       // URLs.
       'cd_sunlight_handler_field_url_favicon' => array(
         'parent' => 'views_handler_field_url',
+        'file' => 'cd_sunlight_handler_field_url.inc',
+      ),
+      'cd_sunlight_handler_field_url_favicon_facebook' => array(
+        'parent' => 'cd_sunlight_handler_field_url_favicon',
         'file' => 'cd_sunlight_handler_field_url.inc',
       ),
       'cd_sunlight_handler_field_url_favicon_youtube' => array(

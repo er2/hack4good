@@ -240,6 +240,13 @@ function cd_sunlight_schema() {
         'pgsql_type' => 'timestamp without time zone',
         'not null' => FALSE,
       ),
+      'facebook_id' => array(
+        'description' => t("Facebook ID."),
+        'type' => 'varchar',
+        'length' => '64',
+        'not null' => TRUE,
+        'default' => ''
+      ),
     ),
     'primary key' => array('legislator_id'),
     'indexes' => array(
@@ -505,4 +512,21 @@ function cd_sunlight_update_6004() {
 
   db_change_field('cd_sunlight_legislators', 'webform', 'webform', $webform);
   return t('Increased length of webform field.');
+}
+
+/**
+ * Update schema with the new fields that Sunlight provides: facebook_id.
+ */
+function cd_sunlight_update_6005() {
+  $facebook_id = array(
+    'description' => t("Facebook ID."),
+    'type' => 'varchar',
+    'length' => '64',
+    'not null' => TRUE,
+    'default' => '',
+    'initial' => '',
+  );
+  db_add_field('cd_sunlight_legislators', 'facebook_id', $facebook_id);
+  _cd_sunlight_congress_update_all();
+  return t('Updated schema with the new fields that Sunlight provides: facebook_id.');
 }
