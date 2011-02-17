@@ -21,16 +21,15 @@ class cd_sunlight_handler_field_congress_picture extends views_handler_field {
 
   function options_form(&$form, &$form_state) {
     parent::options_form($form, $form_state);
-    // TODO: rework this imagecache thing.
-    if (module_exists('imagecache')) {
+    if (function_exists('image_styles')) {
       $formats = array('' => '- None -');
-      foreach (imagecache_presets() as $preset) {
-        $formats[$preset['presetname']] = $preset['presetname'];
+      foreach (image_styles() as $style_key => $style) {
+        $formats[$style_key] = $style['name'];
       }
       $form['format'] = array(
         '#title' => t('Format'),
         '#type' => 'select',
-        '#default_value' => !empty($this->options['format']),
+        '#default_value' => $this->options['format'],
         '#options' => $formats,
       );
     }
@@ -54,14 +53,32 @@ class cd_sunlight_handler_field_congress_picture extends views_handler_field {
       return '';
     }
 
-    $image_url = cd_sunlight_bioguide_image_url($values->{$this->aliases['bioguide_id']});
-    if (!empty($this->options['format']) && function_exists('theme_imagecache') && strpos($image_url, 'http') !== 0) {
-      // TODO: rework this imagecache thing.
-      // TODO Please change this theme call to use an associative array for the $variables parameter.
-      return theme('imagecache', $this->options['format'], $image_url);
+    $img['path'] = cd_sunlight_bioguide_image_url($values->{$this->aliases['bioguide_id']});
+    $img['alt'] = $img['title'] = '';
+    if ($values->cd_sunlight_legislators_lastname) {
+      $img['title'] = "$values->cd_sunlight_legislators_title. $values->cd_sunlight_legislators_firstname $values->cd_sunlight_legislators_lastname";
+      $img['alt'] = "Photo of $img[title]";
+    }
+    // If the image style is resizing the image, add the dimensions to the img tag.
+    // This is a front-end performance improvement.  But it will also prevent
+    // layout issues if Bioguide is being slow and thus we get images directly
+    // from them and not the cache.
+    if (!empty($this->options['format']) && function_exists('image_styles')) {
+      $img['style_name'] = $this->options['format'];
+      $styles = image_styles();
+      foreach ($styles[$this->options['format']]['effects'] as $effect) {
+        foreach (array('width', 'height') as $dimension) {
+          if ($effect['data'][$dimension] && strpos($effect['data'][$dimension], '%') === FALSE) {
+            $img[$dimension] = $effect['data'][$dimension];
+          }
+        }
+      }
+    }
+    if (!empty($img['style_name'])&& strpos($img['path'], 'http') !== 0) {
+      return theme('imagecache', $img);
     }
     else {
-      return theme('image', array('path' => $image_url));
+      return theme('image', $img);
     }
   }
 

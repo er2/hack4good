@@ -238,8 +238,6 @@ function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
   }
 
   // Queue the contact.
-  // @todo This should be INSERT IGNORE to guard against race conditions, but I haven't
-  // figured out how to do that with DBTNG yet.
   db_insert('cd_sunlight_cron')
     ->fields(array(
       'storage_system' => $storage_system,

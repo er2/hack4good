@@ -8,8 +8,6 @@
 
 /**
  * Implements hook_views_data().
- *
- * @todo Why isn't help working?
  */
 function cd_sunlight_views_data() {
   $data['cd_sunlight_legislators']['table']['group'] = t('Congress');

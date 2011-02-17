@@ -186,7 +186,7 @@ function cd_sunlight_schema() {
         'not null' => FALSE,
       ),
       'fec_id' => array(
-        'description' => 'TODO',
+        'description' => 'Federal Elections Commission ID',
         'type' => 'varchar',
         'length' => '16',
         'not null' => FALSE,
