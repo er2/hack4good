@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * Filter handler for state.  This is very basic, but cd_civicrm can override it.

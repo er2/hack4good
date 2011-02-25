@@ -1,4 +1,3 @@
-; $Id$
 name = CiviCRM Congressional District
 description = Stores congressional district information when a CiviCRM contact changes.
 dependencies[] = civicrm

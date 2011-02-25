@@ -1,4 +1,3 @@
-; $Id$
 name = Sunlight Congressional District
 description = Integrates with the Sunlight service to show lists of members of Congress.
 dependencies[] = views
