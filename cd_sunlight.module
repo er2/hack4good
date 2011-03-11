@@ -221,7 +221,6 @@ function cd_sunlight_views_api() {
  *  Conact ID for the given storage engine.
  */
 function cd_sunlight_contact_enqueue($storage_system, $contact_id) {
-
   // If the contact is already queued, bail.
   $query = db_select('cd_sunlight_cron')
     ->condition('storage_system', $storage_system)
@@ -491,11 +490,11 @@ function cd_sunlight_api_lookup_contact($contact) {
   // @todo: There may be more than one CD per zip.
   //        Right now we are just going to take the first one.  We might consider doing something
   //        else later.
-  $cd_data = current($cd_data);
+  $cd_data = reset($cd_data);
 
   // Sunlight is inconsistent with its naming.  This is the only place that it uses the term
   // "number" rather than "district".  We'll change it to be more consistent.
-  if (!empty($cd_data['number'])) {
+  if (isset($cd_data['number'])) {
     $cd_data['district'] = $cd_data['number'];
     unset($cd_data['number']);
   }
