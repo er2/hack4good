@@ -23,10 +23,12 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
    */
   function setUp() {
 
-    // Install our modules.
-    $args = func_get_args();
-    $modules = array_merge(array('cd_sunlight', 'cd_civicrm', 'civicrm'), $args);
-    call_user_func_array(array('parent', 'setUp'), $modules);
+    // This is a PITA.  We need to install the required cd_sunlight module,
+    // but if we try to do the same with CiviCRM we get bizzaro errors with block queries.
+    // We need to install ourself, but doing so will invoke the dependencies (CiviCRM).
+    // So we need to manually install.
+    parent::setUp(array('cd_sunlight'));
+    module_enable(array('cd_civicrm'), FALSE);
 
     // Turn CiviCRM geocoding off so that this doesn't fire when we process the queue.
     variable_set('cd_civicrm_geocoding_off', TRUE);
@@ -52,21 +54,23 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       $this->fail('CiviCRM does not appear to be setup correctly.');
       return;
     }
-    $include_result = include('api/v2/Contact.php');
+    $include_result = include('api/api.php');
     if ($include_result === FALSE) {
       $this->fail('The CiviCRM Contact API could not be included.');
       return;
     }
 
     // Create the contact.
-    $contact_modified_parameters = array(
+    $contact_parameters = array(
+      'version' => '3',
+      'check_permissions' => FALSE,
+      'dupe_check' => FALSE,
       'first_name' => 'Simpletest test',
       'last_name' => 'Simpletest test',
       'email' => 'simpletest@example.org',
       'contact_type' => 'Individual',
-      'dupe_check' => FALSE,
       'address' => array(
-        '1' => array(
+        1 => array(
           'location_type_id' => 1,
           'is_primary' => TRUE,
           'postal_code' => '00501',
@@ -74,27 +78,25 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
         ),
       ),
     );
-    $contact = civicrm_contact_add($contact_modified_parameters);
-    if (civicrm_error($contact)) {
+    $result = civicrm_api('Contact', 'create', $contact_parameters);
+    if (civicrm_error($result)) {
       $this->fail('A CiviCRM contact could not be created.  This might happen if you ' .
         'have non-standard required fields or other restrictions on contacts.' .
-        $this->_var_export($contact_modified_parameters, TRUE) . $this->_var_export($contact, TRUE));
+        $this->_var_export($contact_parameters, TRUE) . $this->_var_export($contact, TRUE));
       return;
     }
 
     // Test that it was created correctly.
     $contact_search = array(
-      'contact_id' => $contact['contact_id'],
-      'return.' . CD_CIVICRM_CD => TRUE,
-      'return.postal_code' => TRUE,
-      'return.country' => TRUE,
-      'return.contact_type' => TRUE,
+      'version' => '3',
+      'contact_id' => $result['id'],
+      'return' => 'postal_code,country,contact_type,' . CD_CIVICRM_CD,
     );
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00501', 'A CiviCRM contact simpletest@example.org was created.');
     $this->verbose(
-      '$contact_parameters: ' . $this->_var_export($contact_modified_parameters, TRUE) .
-      '$contact: ' . $this->_var_export($contact, TRUE) //.
+      '$contact_parameters: ' . $this->_var_export($contact_parameters, TRUE) .
+      '$contact: ' . $this->_var_export($contact, TRUE)
     );
 
     // Test that it was enqueued.
@@ -103,12 +105,15 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
     // Process and test.
     $this->_processQueue();
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_CIVICRM_CD], 'NY1', 'Contact CD is ' . $contact[CD_CIVICRM_CD]);
     $this->verbose($this->_var_export($contact_search, TRUE) . $this->_var_export($contact, TRUE));
 
     // Edit the contact.
     $contact_modified_parameters = array(
+      'version' => '3',
+      'check_permissions' => FALSE,
+      'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       'address' => array(
@@ -119,22 +124,22 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
         ),
       ),
     );
-    $contact_modified = civicrm_contact_add($contact_modified_parameters);
-    if (civicrm_error($contact)) {
+    $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
+    if (civicrm_error($result)) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
-        $this->_var_export($contact_modified, TRUE));
+        $this->_var_export($result, TRUE));
       return;
     }
 
     // We should have the new postal code.
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '12345', 'CiviCRM contact simpletest@example.org was edited.');
     $this->verbose(
       '$contact_search: ' . $this->_var_export($contact_search, TRUE) .
       '$contact: ' . $this->_var_export($contact, TRUE) .
       '$contact_modified_parameters: ' . $this->_var_export($contact_modified_parameters, TRUE) .
-      '$contact_modified: ' . $this->_var_export($contact_modified, TRUE));
+      '$result: ' . $this->_var_export($result, TRUE));
 
     // Editing the postal code should re-enqueue the contact.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
@@ -142,7 +147,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
     // Process the queue, our contact should be processed.
     $this->_processQueue();
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact[CD_CIVICRM_CD], 'NY21', 'Contact CD is ' . $contact[CD_CIVICRM_CD]);
     $this->verbose(
       '$contact_search: ' . $this->_var_export($contact_search, TRUE) .
@@ -150,6 +155,9 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
 
     // Give the contact a bogus Zip code.
     $contact_modified_parameters = array(
+      'version' => '3',
+      'check_permissions' => FALSE,
+      'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       'address' => array(
@@ -160,22 +168,22 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
         ),
       ),
     );
-    $contact_modified = civicrm_contact_add($contact_modified_parameters);
-    if (civicrm_error($contact)) {
+    $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
+    if (civicrm_error($result)) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
-        $this->_var_export($contact_modified, TRUE));
+        $this->_var_export($result, TRUE));
       return;
     }
 
     // We should have the new postal code.
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00000', 'CiviCRM contact simpletest@example.org was edited.');
     $this->verbose(
       '$contact_search: ' . $this->_var_export($contact_search, TRUE) .
       '$contact: ' . $this->_var_export($contact, TRUE) .
       '$contact_modified_parameters: ' . $this->_var_export($contact_modified_parameters, TRUE) .
-      '$contact_modified: ' . $this->_var_export($contact_modified, TRUE));
+      '$contact_modified: ' . $this->_var_export($result, TRUE));
 
     // Editing the postal code should re-enqueue the contact.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
@@ -183,7 +191,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
     // Process the queue, our contact should be processed.
     $this->_processQueue();
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     // The old CD should remain in place.
     $this->assertEqual($contact[CD_CIVICRM_CD], 'NY21', 'Contact CD is ' . $contact[CD_CIVICRM_CD]);
     $this->verbose(
@@ -192,6 +200,9 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
 
     // Give the contact a bogus Zip code and remove the old CD.
     $contact_modified_parameters = array(
+      'version' => '3',
+      'check_permissions' => FALSE,
+      'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       CD_CIVICRM_CD => '',
@@ -203,23 +214,23 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
         ),
       ),
     );
-    $contact_modified = civicrm_contact_add($contact_modified_parameters);
+    $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
     if (civicrm_error($contact)) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
-        $this->_var_export($contact_modified, TRUE));
+        $this->_var_export($result, TRUE));
       return;
     }
 
     // We should have the new postal code and the CD should be gone.
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     $this->assertEqual($contact['postal_code'], '00001', 'CiviCRM contact simpletest@example.org was edited.');
     $this->assertEqual($contact[CD_CIVICRM_CD], '', 'CiviCRM contact simpletest@example.org CD was removed.');
     $this->verbose(
       '$contact_search: ' . $this->_var_export($contact_search, TRUE) .
       '$contact: ' . $this->_var_export($contact, TRUE) .
       '$contact_modified_parameters: ' . $this->_var_export($contact_modified_parameters, TRUE) .
-      '$contact_modified: ' . $this->_var_export($contact_modified, TRUE));
+      '$contact_modified: ' . $this->_var_export($result, TRUE));
 
     // Editing the postal code should re-enqueue the contact.
     $this->assertTrue($this->_checkQueue($contact['contact_id']), 'Contact enqueued when edited');
@@ -227,7 +238,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
     // Process the queue, our contact should be processed.
     $this->_processQueue();
     $this->assertFalse($this->_checkQueue($contact['contact_id']), 'Contact dequeued when queue processed.');
-    $contact = _cd_civicrm_civicrm_contact_get($contact_search);
+    $contact = _cd_civicrm_contact_get($contact_search);
     // The old CD should remain in place.
     $this->assertEqual($contact[CD_CIVICRM_CD], 'not found', 'Contact CD is ' . $contact[CD_CIVICRM_CD]);
     $this->verbose(
@@ -235,7 +246,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       '$contact: ' . $this->_var_export($contact, TRUE));
 
     // Cleanup. Delete the contact.
-    $result = civicrm_contact_delete($contact);
+    $result = civicrm_api('Contact', 'delete', $contact_search);
     if ($result['is_error']) {
       $this->fail("The test CiviCRM contact 'Simpletest test' could not be deleted.");
     }
@@ -248,8 +259,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
    * @param int $contact_id
    */
   protected function _checkQueue($contact_id) {
-    return db_result(db_query(
-      'SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = %d AND storage_system = "civicrm" AND processed = 0', $contact_id));
+    return db_query('SELECT 1 FROM {cd_sunlight_cron} WHERE contact_id = :contact_id AND storage_system = :storage_system AND processed = :processed', array(':contact_id' => $contact_id, ':storage_system' => "civicrm", ':processed' => 0))->fetchField();
   }
 
   /**
@@ -272,8 +282,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
    *
    */
   protected function _variable_orginal_set($name) {
-    $value = unserialize(db_result(db_query(
-      'SELECT value FROM variable WHERE name = "%s"', $name)));
+    $value = unserialize(db_query('SELECT value FROM variable WHERE name = :name', array(':name' => $name))->fetchField());
     $this->verbose("$name: " . $this->_var_export($value));
     variable_set($name, $value);
     return $value;

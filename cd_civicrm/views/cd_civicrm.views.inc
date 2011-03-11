@@ -6,7 +6,7 @@
  */
 
 /**
- * Implementation of hook_views_data_alter().
+ * Implements hook_views_data_alter().
  */
 function cd_civicrm_views_data_alter(&$data) {
   $data['cd_sunlight_legislators']['state_current'] = array(
@@ -74,7 +74,7 @@ function cd_civicrm_views_default_views_alter(&$views) {
 }
 
 /**
- * Implementation of hook_views_handlers().
+ * Implements hook_views_handlers().
  */
 function cd_civicrm_views_handlers() {
   return array(
@@ -112,11 +112,10 @@ function cd_sunlight_views_query_substitutions($view) {
     if ($user->uid) {
       $cd = cd_civicrm_user_get_cd($user->uid);
       if ($cd && $cd != 'not found') {
-        $substitutions['***CURRENT_USERS_STATE***'] = "'" . cd_sunlight_cd_parse_state($cd) . "'";
+        $substitutions['***CURRENT_USERS_STATE***'] = cd_sunlight_cd_parse_state($cd);
         $substitutions['***CURRENT_USERS_DISTRICT***'] = intval(cd_sunlight_cd_parse_district($cd));
       }
     }
   }
   return $substitutions;
 }
-

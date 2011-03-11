@@ -8,6 +8,9 @@
 /**
  * Admin settings form.
  *
+ * @see cd_civicrm_settings_form_validate()
+ * @see cd_civicrm_settings_form_submit()
+ *
  * @ingroup forms
  */
 function cd_civicrm_settings_form() {
@@ -39,13 +42,13 @@ function cd_civicrm_settings_form() {
   $form['geocode']['cd_civicrm_geocode_key'] = array(
     '#title' => t('CiviCRM command-line script key'),
     '#type' => 'item',
-    '#value' => defined('CIVICRM_SITE_KEY') && CIVICRM_SITE_KEY ? 'Is defined' : 'Is not defined',
+    '#markup' => defined('CIVICRM_SITE_KEY') && CIVICRM_SITE_KEY ? 'Is defined' : 'Is not defined',
     '#description' => t('The CiviCRM command-line key.'),
   );
   $form['geocode']['cd_civicrm_geocode_crypt'] = array(
     '#title' => t('Crypt libraries'),
     '#type' => 'item',
-    '#value' => _cd_civicrm_crypt_enabled() ? 'Available' : 'Not available',
+    '#markup' => _cd_civicrm_crypt_enabled() ? 'Available' : 'Not available',
     '#description' => t('The <a href=!url>PHP MCrypt extension</a> is required for storing the '
       . 'username. ', array(
       '!url' => 'http://www.php.net/manual/en/book.mcrypt.php',
@@ -62,7 +65,7 @@ function cd_civicrm_settings_form() {
   $form['geocode']['cd_civicrm_geocode_password'] = array(
     '#type' => 'item',
     '#title' => t('Password of the Drupal user for running CiviCRM geocode script'),
-    '#value' => defined('CD_CIVICRM_GEOCODE_PASSWORD') && CD_CIVICRM_GEOCODE_PASSWORD ? 'Is defined' : 'Is not defined',
+    '#markup' => defined('CD_CIVICRM_GEOCODE_PASSWORD') && CD_CIVICRM_GEOCODE_PASSWORD ? 'Is defined' : 'Is not defined',
     '#description' => t('Define the password in a constant called !const in settings.php',
       array('!const' => 'CD_CIVICRM_GEOCODE_PASSWORD')),
     '#attributes' => array('autocomplete' => 'off'),
@@ -107,13 +110,21 @@ function cd_civicrm_settings_form() {
   return $form;
 }
 
+/**
+ * Admin settings form validator.
+ *
+ * @see cd_civicrm_settings_form()
+ * @see cd_civicrm_settings_form_submit()
+ *
+ * @ingroup forms
+ */
 function cd_civicrm_settings_form_validate($form, &$form_state) {
 
   // Test the geocoding username.
   if ($user_name = $form_state['values']['cd_civicrm_geocode_username']) {
     $message = 'The geocoding user does not exist';
     $user_valid = FALSE;
-    $account = user_load(array('name' => $user_name));
+    $account = array_shift(user_load_multiple(array(), array('name' => $user_name)));
     if ($account && $account->uid) {
       $message = 'The geocoding user exists';
       if (user_access('access all custom data', $account)) {
@@ -152,21 +163,27 @@ function cd_civicrm_settings_form_validate($form, &$form_state) {
  * Form to choose CiviCRM custom fields that stores data.
  *
  * @ingroup forms
+ *
+ * @see cd_civicrm_settings_fields_form_validate()
+ * @see cd_civicrm_settings_fields_form_submit()
  */
-function cd_civicrm_settings_fields_form() {
+function cd_civicrm_settings_fields_form($form, &$form_state) {
   global $db_prefix;
 
   // Get options.
   $fields = array();
-  if (!isset($db_prefix['civicrm_custom_field'])) {
-    drupal_set_message(t('You must configure <a href="!url">table prefixes for CiviCRM tables</a> first.', array('!url' => url('admin/reports/status'))), 'error');
+  if (!db_table_exists('civicrm_custom_field')) {
+    drupal_set_message(t('Table civicrm_custom_field does not exist. You must configure <a href="!url">table prefixes for CiviCRM tables</a> first.', array('!url' => url('admin/reports/status'))), 'error');
   }
   else {
-    $resource = db_query('SELECT id, custom_group_id, label
-      FROM {civicrm_custom_field}
-      WHERE data_type = "string"
-      ORDER BY custom_group_id, weight');
-    while ($field = db_fetch_array($resource)) {
+    // TODO: Some day we need to use the CiviCRM internal API.
+    $query = db_select('civicrm_custom_field', 'f')
+      ->fields('f', array('id', 'custom_group_id', 'label'))
+      ->condition('data_type', 'string')
+      ->orderBy('custom_group_id')
+      ->orderBy('weight')
+      ->execute();
+    while ($field = $query->fetchAssoc()) {
       $fields[$field['id']] = $field['custom_group_id'] . ': ' . check_plain($field['label']);
     }
   }
@@ -217,36 +234,57 @@ function cd_civicrm_settings_fields_form() {
 
 }
 
+/**
+ * Validator for field binding form. 
+ * 
+ * @see cd_civicrm_settings_fields_form()
+ * @see cd_civicrm_settings_fields_form_submit()
+ *
+ * @in_group forms
+ */
 function cd_civicrm_settings_fields_form_validate($form, &$form_state) {
 
   // Check that both fields are in the same table.
-  $table_1 = db_result(db_query('SELECT custom_group_id
-    FROM {civicrm_custom_field}
-    WHERE id = %d',
-    $form_state['values']['field_cd_civicrm_cd']));
-  $table_2 = db_result(db_query('SELECT custom_group_id
-    FROM {civicrm_custom_field}
-    WHERE id = %d',
-    $form_state['values']['field_cd_civicrm_cd_override']));
+  $table_1 = db_select('civicrm_custom_field', 'f')
+    ->fields('f', array('custom_group_id'))
+    ->condition('id', $form_state['values']['field_cd_civicrm_cd'])
+    ->execute()
+    ->fetchField();
+  $table_2 = db_select('civicrm_custom_field', 'f')
+    ->fields('f', array('custom_group_id'))
+    ->condition('id', $form_state['values']['field_cd_civicrm_cd_override'])
+    ->execute()
+    ->fetchField();
   if ($table_1 != $table_2) {
-    form_set_error('field_cd_civicrm_cd_override'
-      , t('Choose two fields from the same group.'));
+    form_set_error('field_cd_civicrm_cd_override', t('Choose two fields from the same group.'));
   }
 }
 
+/**
+ * Submit handler for field binding form.
+ *
+ * @in_group forms
+ *
+ * @see cd_civicrm_settings_fields_form()
+ * @see cd_civicrm_settings_fields_form_validate()
+ */
 function cd_civicrm_settings_fields_form_submit($form, &$form_state) {
 
   // Retrieve the fields data.
-  $field_cd_civicrm_cd = db_fetch_object(db_query('SELECT f.id, f.column_name, g.table_name
-    FROM {civicrm_custom_field} f
-    INNER JOIN {civicrm_custom_group} g
-      ON f.custom_group_id = g.id
-    WHERE f.id = %d', $form_state['values']['field_cd_civicrm_cd']));
-  $field_cd_civicrm_cd_override = db_fetch_object(db_query('SELECT f.id, f.column_name, g.table_name
-    FROM {civicrm_custom_field} f
-    INNER JOIN {civicrm_custom_group} g
-      ON f.custom_group_id = g.id
-    WHERE f.id = %d', $form_state['values']['field_cd_civicrm_cd_override']));
+  $query = db_select('civicrm_custom_field', 'f');
+  $query->join('civicrm_custom_group', 'g', 'f.custom_group_id = g.id');
+  $field_cd_civicrm_cd = $query->fields('f', array('id', 'column_name'))
+    ->fields('g', array('table_name'))
+    ->condition('f.id', $form_state['values']['field_cd_civicrm_cd'])
+    ->execute()
+    ->fetchObject();
+  $query = db_select('civicrm_custom_field', 'f');
+  $query->join('civicrm_custom_group', 'g', 'f.custom_group_id = g.id');
+  $field_cd_civicrm_cd_override = $query->fields('f', array('id', 'column_name'))
+    ->fields('g', array('table_name'))
+    ->condition('f.id', $form_state['values']['field_cd_civicrm_cd_override'])
+    ->execute()
+    ->fetchObject();
 
   // Save the variables.
   variable_set('cd_civicrm_custom_table',

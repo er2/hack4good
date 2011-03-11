@@ -20,19 +20,22 @@ class cd_civicrm_handler_filter_state_current_user extends views_handler_filter_
 
   function query() {
     $this->ensure_my_table();
-    $where = "$this->table_alias.$this->real_field ";
+
+    $field = $this->table_alias . '.' . $this->real_field;
+    $or = db_or();
 
     if (empty($this->value)) {
-      $where .= '<> ***CURRENT_USERS_STATE***';
+      $or->condition($field, '***CURRENT_USERS_STATE***', '<>');
       if ($this->accept_null) {
-        $where = '(' . $where . " OR $this->table_alias.$this->real_field IS NULL)";
+        $or->isNull($field);
       }
     }
     else {
-      $where .= '= ***CURRENT_USERS_STATE***';
+      $or->condition($field, '***CURRENT_USERS_STATE***', '=');
     }
-    $this->query->add_where($this->options['group'], $where);
+    $this->query->add_where($this->options['group'], $or);
   }
+
 }
 
 /**
@@ -52,8 +55,9 @@ class cd_civicrm_handler_filter_district_current_user extends views_handler_filt
     $this->ensure_my_table();
 
     // Remember that senators have a CD of 0.
-    $where = "$this->table_alias.$this->real_field IN (***CURRENT_USERS_DISTRICT***, 0)";
+    $or = db_or();
+    $or->condition($this->table_alias . '.' . $this->real_field, array('***CURRENT_USERS_DISTRICT***', 0), 'IN');
 
-    $this->query->add_where($this->options['group'], $where);
+    $this->query->add_where($this->options['group'], $or);
   }
 }
