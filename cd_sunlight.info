@@ -3,6 +3,7 @@ description = Integrates with the Sunlight service to show lists of members of C
 dependencies[] = views
 core = 7.x
 php = 5.0
+configure = admin/config/services/cd_sunlight
 
 files[] = cd_sunlight.admin.inc
 files[] = cd_sunlight.install
