@@ -529,3 +529,20 @@ function cd_sunlight_update_6005() {
   _cd_sunlight_congress_update_all();
   return t('Updated schema with the new fields that Sunlight provides: facebook_id.');
 }
+
+
+/**
+ * Clear appropriate caches.
+ */
+function cd_sunlight_update_7100() {
+
+  // Remove the blocks that had the old-style capitalized names.
+  db_query("DELETE FROM {block} WHERE module = 'views' AND delta IN('Congress-block_1', 'Congress-block_3')");
+
+  // Clear the caches.
+  cache_clear_all('*', 'cache_block', TRUE);
+  cache_clear_all('*', 'cache_views', TRUE);
+  cache_clear_all('*', 'cache_page', TRUE);
+  
+  return t('Clear appropriate caches.');
+}

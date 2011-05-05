@@ -6,8 +6,9 @@
  *  - lookup Congressional Districts when a CiviCRM contact changes.
  *  - provide API to get information about contacts, users and how they interrelate.
  *
- * @todo write geocode integration for cd lookup form.
- * @todo if CD field is on a profile, override with cd_override if necessary.
+ * @todo Make sure that we only query non-deleted contacts.  Ex. batch queue. 
+ * @todo Write geocode integration for cd lookup form.
+ * @todo If CD field is on a profile, override with cd_override if necessary.
  */
 
 /**
@@ -451,8 +452,7 @@ function cd_civicrm_validate_civicrm_data($contact) {
  * Run the CiviCRM geocoding script.
  *
  * @return object
- *  an HTTP response object.  We've already logged the response, you can do further work with it
- *  if you'd like.
+ *  an HTTP response object.  Any errors have already been logged.
  */
 function _cd_civicrm_contacts_geocode() {
 
@@ -596,13 +596,14 @@ function _cd_civicrm_batch(&$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['contact_id'] = 0;
-    $context['sandbox']['max'] = db_query('SELECT COUNT(*) FROM {civicrm_contact}')->fetchField();
+    $context['sandbox']['max'] = db_query('SELECT COUNT(*) FROM {civicrm_contact} WHERE is_deleted <> 1')->fetchField();
   }
 
   // Iterate through the contacts.
   $query = db_select('civicrm_contact', 'c')
     ->fields('c', array('id'))
     ->condition('id', $context['sandbox']['contact_id'], '>')
+    ->condition('is_deleted', 0)
     ->range(NULL, $limit)
     ->execute();
   while ($contact_id = $query->fetchField()) {
@@ -649,7 +650,7 @@ function _cd_civicrm_uid_get_contact_id($uid) {
     'debug' => variable_get('cd_civicrm_debug', FALSE),
   );
   $result = civicrm_api('uf_match', 'get', $params);
-  $contact_id = !$result['is_error'] ? $result['values']['contact_id'] : NULL;
+  $contact_id = !empty($result['values']['contact_id']) ? $result['values']['contact_id'] : NULL;
   if (!$contact_id && variable_get('cd_sunlight_debug', FALSE)) {
     watchdog('cd_civicrm', 'CiviCRM API error.  Could not find a contact for uid @contact_id <pre>@trace</trace>',
       array('@uid' => $uid, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_DEBUG);
@@ -904,71 +905,31 @@ function _cd_civicrm_process_queue() {
   if (variable_get('cd_civicrm_geocoding_off', FALSE)) {
     _cd_civicrm_contacts_geocode();
 
-    // Hooks don't fire during updateAddress.php. Enqueue all contacts that
+    // Hooks may or may not fire during updateAddress.php. Enqueue all contacts that
     // have lat/long,but not a CD.
     civicrm_initialize();
 
-    $res = db_query(
-      'SELECT a.contact_id ' .
-      'FROM {civicrm_address} a ' .
-      'LEFT JOIN {' . CD_CIVICRM_CUSTOM_TABLE . '} c ' .
-        'ON c.entity_id = a.contact_id ' .
-      'WHERE ( ' .
-          'c.' . CD_CIVICRM_CUSTOM_FIELD_CD . ' IS NULL ' .
-          'OR c.' . CD_CIVICRM_CUSTOM_FIELD_CD . ' = "" ' .
-        ') ' .
-        'AND a.is_primary = 1 ' .
-        'AND a.geo_code_1 IS NOT NULL ' .
-        'AND a.geo_code_1 <> 0 ' .
-        'AND a.country_id = ' . CD_CIVICRM_US_COUNTRY_ID . ' ' .
-        'AND a.state_province_id <> ' . CD_CIVICRM_NON_US_STATE_PROVINCE_ID . ' ' .
-        'AND ( ' .
-          '( ' .
-            'a.postal_code IS NOT NULL AND ' .
-            'a.postal_code <> "" ' .
-          ') ' .
-          'OR ( ' .
-            'a.street_address IS NOT NULL AND ' .
-            'a.street_address <> "" ' .
-          ') ' .
-        ') '
-    );
-
+    // TODO: consider only querying non-deleted contacts here.  But that would
+    //  require another JOIN which would be non performant.  This is already a
+    //  really long query on big databases, so it might not be worth it.  
     $query = db_select('civicrm_address', 'a');
-    $query->fields('a', array('contact_id'));
     $query->leftJoin(CD_CIVICRM_CUSTOM_TABLE, 'c', 'c.entity_id = a.contact_id');
-    $query->condition($field, $value, $operator);
+    $query->fields('a', array('contact_id'))
+      ->condition('a.is_primary', 1)
+      ->condition('a.geo_code_1', '', 'IS NOT NULL')
+      ->condition('a.country_id', CD_CIVICRM_US_COUNTRY_ID)
+      ->condition('a.state_province_id', CD_CIVICRM_NON_US_STATE_PROVINCE_ID, '<>')
+      ->where('c.' . CD_CIVICRM_CUSTOM_FIELD_CD . ' IS NULL OR c.' . CD_CIVICRM_CUSTOM_FIELD_CD . " = ''")
+      ->where("(a.postal_code IS NOT NULL AND a.postal_code <> '') " .
+          "OR (a.street_address IS NOT NULL AND a.street_address <> '')");
+    $result = $query->execute();
 
-      /*
-
-SELECT a.contact_id
-FROM civicrm_address a
-LEFT JOIN civicrm_value_congressional_district_4 c
-ON c.entity_id = a.contact_id
-WHERE (
-c.congressional_district_7 IS NULL
-OR c.congressional_district_7 = ""
-)
-AND a.is_primary = 1
-AND a.geo_code_1 IS NOT NULL
-AND a.geo_code_1 <> 0
-AND (
-(
-a.postal_code IS NOT NULL AND
-a.postal_code <> ""
-)
-OR (
-a.street_address IS NOT NULL AND
-a.street_address <> ""
-)
-)
-
-       */
     $count = 0;
-    while ($contact = db_fetch_object($res)) {
+    while ($contact = $result->fetchAssoc()) {
+      break;
       // Some buggy versions of CiviCRM have addresses with no contact_id.
-      if (!empty($contact->cid)) {
-        cd_sunlight_contact_enqueue('civicrm', $contact->contact_id);
+      if (!empty($contact['contact_id'])) {
+        cd_sunlight_contact_enqueue('civicrm', $contact['contact_id']);
         $count++;
       }
     }

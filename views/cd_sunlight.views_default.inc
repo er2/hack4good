@@ -13,7 +13,7 @@ function cd_sunlight_views_default_views() {
    * View 'Congress'
    */
   $view = new view;
-  $view->name = 'Congress';
+  $view->name = 'congress';
   $view->description = 'Current members of Congress.';
   $view->tag = '';
   $view->base_table = 'cd_sunlight_legislators';

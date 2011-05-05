@@ -245,7 +245,7 @@ class cd_sunlight_handler_field_url_favicon_opensecrets extends cd_sunlight_hand
 class cd_sunlight_handler_field_url_favicon_congresspedia extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
-    $this->favicon_url = 'http://www.opencongress.org/favicon.ico';
+    $this->favicon_url = 'http://www.opencongress.org/favicon.png';
     $this->human_readable = 'OpenCongress';
     $this->url_path = $values->{$this->field_alias};
     $this->url_query = NULL;

@@ -83,9 +83,8 @@ function cd_civicrm_requirements($phase) {
     // Report the number of records in the batch geocoding queue.
     if (variable_get('cd_civicrm_geocoding_off', FALSE)) {
       $query = db_select('civicrm_address')
-        ->condition('geo_code_1')
-        ->condition('country_id', NULL, 'IS NOT NULL')
-        ->condition('state_province_id', NULL, 'IS NOT NULL');
+        ->where('geo_code_1 is null OR geo_code_1 = 0')
+        ->condition('country_id', NULL, 'IS NOT NULL');
       $count = $query->countQuery()->execute()->fetchField();
 
       $requirements['cd_civicrm_geocode_count'] = array(

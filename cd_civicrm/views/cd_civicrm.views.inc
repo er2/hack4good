@@ -37,8 +37,8 @@ function cd_civicrm_views_data_alter(&$data) {
  * Implements hook_views_default_views_alter().
  */
 function cd_civicrm_views_default_views_alter(&$views) {
-  if (isset($views['Congress'])) {
-    $view = & $views['Congress'];
+  if (isset($views['congress'])) {
+    $view = & $views['congress'];
     /* Display: Block - Current user */
     $handler = $view->new_display('block', 'Block - Current user', 'block_3');
     $handler->display->display_options['defaults']['filters'] = FALSE;

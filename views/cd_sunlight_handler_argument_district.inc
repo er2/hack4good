@@ -11,17 +11,13 @@ class cd_sunlight_handler_argument_district extends views_handler_argument_numer
     // Add senators to the district condition.
     // First find the district condition.
     foreach ($this->query->where[0]['conditions'] as $clause_id => $clause) {
-      if (strpos($clause['field'], '.district') !== FALSE) {
+      if (preg_match('!\w+\.district!', $clause['field'], $matches)) {
 
         // Remove the old clause.
-        $field = $this->query->where[0]['conditions'][$clause_id]['field'];
-        $districts = $this->query->where[0]['conditions'][$clause_id]['value'];
+        $field = $matches[0];
+        $districts = $clause['value'];
         unset($this->query->where[0]['conditions'][$clause_id]);
 
-        if (!is_array($districts)) {
-          // This happens if condition was "WHERE district = N";
-          $districts = array($districts);
-        }
         $districts[] = 0;
 
         // Add a new group.
