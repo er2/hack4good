@@ -79,7 +79,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       ),
     );
     $result = civicrm_api('Contact', 'create', $contact_parameters);
-    if (civicrm_error($result)) {
+    if ($result['is_error']) {
       $this->fail('A CiviCRM contact could not be created.  This might happen if you ' .
         'have non-standard required fields or other restrictions on contacts.' .
         $this->_var_export($contact_parameters, TRUE) . $this->_var_export($contact, TRUE));
@@ -90,6 +90,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
     $contact_search = array(
       'version' => '3',
       'contact_id' => $result['id'],
+      'id' => $result['id'],
       'return' => 'postal_code,country,contact_type,' . CD_CIVICRM_CD,
     );
     $contact = _cd_civicrm_contact_get($contact_search);
@@ -115,6 +116,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       'check_permissions' => FALSE,
       'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
+      'id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       'address' => array(
         1 => array(
@@ -125,7 +127,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       ),
     );
     $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
-    if (civicrm_error($result)) {
+    if ($result['is_error']) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
         $this->_var_export($result, TRUE));
@@ -159,6 +161,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       'check_permissions' => FALSE,
       'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
+      'id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       'address' => array(
         1 => array(
@@ -169,7 +172,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       ),
     );
     $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
-    if (civicrm_error($result)) {
+    if ($result['is_error']) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
         $this->_var_export($result, TRUE));
@@ -204,6 +207,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       'check_permissions' => FALSE,
       'dupe_check' => FALSE,
       'contact_id' => $contact['contact_id'],
+      'id' => $contact['contact_id'],
       'contact_type' => 'Individual',
       CD_CIVICRM_CD => '',
       'address' => array(
@@ -215,7 +219,7 @@ class cdCiviCRMWebTestCase extends DrupalWebTestCase {
       ),
     );
     $result = civicrm_api('Contact', 'update', $contact_modified_parameters);
-    if (civicrm_error($contact)) {
+    if ($result['is_error']) {
       $this->fail('The CiviCRM contact could not be edited: ' .
         $this->_var_export($contact_modified_parameters, TRUE) .
         $this->_var_export($result, TRUE));

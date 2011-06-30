@@ -650,10 +650,22 @@ function _cd_civicrm_uid_get_contact_id($uid) {
     'debug' => variable_get('cd_civicrm_debug', FALSE),
   );
   $result = civicrm_api('uf_match', 'get', $params);
-  $contact_id = !empty($result['values']['contact_id']) ? $result['values']['contact_id'] : NULL;
+
+  $contact_id = NULL;
+  // CiviCRM 4.0.0-ish.
+  if (!empty($result['values']['contact_id'])) {
+    $contact_id = $result['values']['contact_id'];
+  }
+  // After CiviCRM 4.0.2-ish.
+  else {
+    $result = civicrm_api('UFMatch', 'get', $params);
+    $uf_record = reset($result['values']);
+    $contact_id = !empty($uf_record['contact_id']) ? $uf_record['contact_id'] : NULL;
+  }
   if (!$contact_id && variable_get('cd_sunlight_debug', FALSE)) {
-    watchdog('cd_civicrm', 'CiviCRM API error.  Could not find a contact for uid @contact_id <pre>@trace</trace>',
-      array('@uid' => $uid, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_DEBUG);
+    watchdog('cd_civicrm', 'CiviCRM API error.  Could not find a contact for uid @uid <pre>@trace @params @result</pre>',
+      array('@uid' => $uid, '@trace' => _cd_sunlight_backtrace(), '@params' => var_export($params, TRUE),
+      '@result' => var_export($result, TRUE)), WATCHDOG_DEBUG);
   }
   return $contact_id;
 }
@@ -676,10 +688,22 @@ function _cd_civicrm_contact_id_get_uid($contact_id) {
     'debug' => variable_get('cd_civicrm_debug', FALSE),
   );
   $result = civicrm_api('uf_match', 'get', $params);
-  $uid = !$result['is_error'] ? $result['values']['uf_id'] : NULL;
+
+  $uid = NULL;
+  // CiviCRM 4.0.0-ish.
+  if (!empty($result['values']['uf_id'])) {
+    $uid = $result['values']['uf_id'];
+  }
+  // After CiviCRM 4.0.2-ish.
+  else {
+    $result = civicrm_api('UFMatch', 'get', $params);
+    $uf_record = reset($result['values']);
+    $uid = !empty($uf_record['uf_id']) ? $uf_record['uf_id'] : NULL;
+  }
   if (!$uid && variable_get('cd_sunlight_debug', FALSE)) {
-    watchdog('cd_civicrm', 'CiviCRM API error.  Could not find a uid for contact @contact_id <pre>@trace</trace>',
-      array('@contact_id' => $contact_id, '@trace' => _cd_sunlight_backtrace()), WATCHDOG_DEBUG);
+    watchdog('cd_civicrm', 'CiviCRM API error.  Could not find a uid for contact @contact_id <pre>@trace @params @result</pre>',
+      array('@contact_id' => $contact_id, '@trace' => _cd_sunlight_backtrace(), '@params' => var_export($params, TRUE),
+      '@result' => var_export($result, TRUE)), WATCHDOG_DEBUG);
   }
   return $uid;
 }
@@ -862,6 +886,8 @@ function _cd_civicrm_contact_set_cd($contact_id, $cd = NULL, $override = NULL) {
   // Set the contact.
   $contact_params = array(
     'contact_id' => $contact_id,
+    // For after CiviCRM 4.0.1-ish.
+    'id' => $contact_id,
     'version' => 3,
     'check_permissions' => FALSE,
     'debug' => variable_get('cd_sunlight_debug', FALSE),

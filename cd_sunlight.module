@@ -834,6 +834,7 @@ function _cd_sunlight_legislators_exist() {
 function _cd_sunlight_backtrace() {
   $backtrace = debug_backtrace(FALSE);
   $info = array();
+
   foreach ($backtrace as $trace) {
 
     // Add args to our trace, placeholders for non-scalars.

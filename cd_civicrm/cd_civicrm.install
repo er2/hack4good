@@ -82,6 +82,9 @@ function cd_civicrm_requirements($phase) {
 
     // Report the number of records in the batch geocoding queue.
     if (variable_get('cd_civicrm_geocoding_off', FALSE)) {
+      // We don't want this query to take forever on large installs, so we make it very rough.  
+      // In reality CiviCRM will attempt to geocode only if there is a country_id and both 
+      // geocodes are blank. 
       $query = db_select('civicrm_address')
         ->where('geo_code_1 is null OR geo_code_1 = 0')
         ->condition('country_id', NULL, 'IS NOT NULL');
