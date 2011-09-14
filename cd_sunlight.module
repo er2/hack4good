@@ -81,9 +81,9 @@ function cd_sunlight_menu() {
     'weight' => '2',
     'file' => 'cd_sunlight.admin.inc',
   );
-  if (function_exists('views_get_view') && $congress_view = views_get_view('Congress')) {
+  if (function_exists('views_get_view') && $congress_view = views_get_view('congress')) {
     if ($congress_view->type == t('Overridden')) {
-      watchdog('cd_sunlight', 'The "Congress" view has been overridden.  The Congress Search form ' .
+      watchdog('cd_sunlight', 'The "congress" view has been overridden.  The Congress Search form ' .
         'depends on the default arguments to create its results.  If you have modified the ' .
         'arguments, the search form might not display correct results.', WATCHDOG_WARNING);
     }
