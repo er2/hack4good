@@ -14,7 +14,7 @@ This module
 - Exposes the members of Congress to the Views module.
 - With one of the contact integration modules (currently just CiviCRM Congressional Districts
   module) the congressional district of your contacts can be automatically determined.  
-
+- Provides a form to search for members of Congress by ZIP.
 
 
 ** INSTALL **
