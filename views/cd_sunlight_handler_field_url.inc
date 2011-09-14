@@ -228,7 +228,7 @@ class cd_sunlight_handler_field_url_favicon_govtrack extends cd_sunlight_handler
 class cd_sunlight_handler_field_url_favicon_opensecrets extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
-    $this->favicon_url = 'http://www.opensecrets.org/img/favicon.ico';
+    $this->favicon_url = 'http://www.opensecrets.org/favicon.ico';
     $this->human_readable = 'OpenSecrets';
     $this->url_path = 'http://www.opensecrets.org/politicians/summary.php';
     $this->url_query = 'cid=' . $values->{$this->field_alias};
@@ -295,7 +295,7 @@ class cd_sunlight_handler_field_url_favicon_progressive_punch extends cd_sunligh
   }
 
   function render($values) {
-    $this->favicon_url = 'http://progressivepunch.org/images/boxer_l2.jpg';
+    $this->favicon_url = 'http://www.progressivepunch.org/favicon.ico';
     $this->human_readable = 'Progressive Punch';
     $this->url_path = 'http://progressivepunch.org/members.htm';
 
