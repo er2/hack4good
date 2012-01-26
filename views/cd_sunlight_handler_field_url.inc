@@ -194,7 +194,7 @@ class cd_sunlight_handler_field_url_favicon_bioguide extends cd_sunlight_handler
 class cd_sunlight_handler_field_url_favicon_votesmart extends cd_sunlight_handler_field_url_favicon {
 
   function render($values) {
-    $this->favicon_url = 'http://votesmart.org/favicon.ico';
+    $this->favicon_url = 'http://votesmart.org/static/images/subpages/share/capitol_guy_blue_trans.gif';
     $this->human_readable = 'Project Vote Smart';
     $this->url_path = 'http://votesmart.org/bio.php';
     $this->url_query = 'can_id=' . $values->{$this->field_alias};
