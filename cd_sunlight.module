@@ -797,8 +797,8 @@ function _cd_sunlight_state_list_with_non_voting_congresspersons() {
  * @return TRUE on success, else FALSE.
  */
 function _cd_sunlight_connection_test() {
-  $test_data = cd_sunlight_api_lookup('districts.getDistrictsFromZip', array('zip' => '12345'));
-  if ($test_data == FALSE || !isset($test_data[0]['state']) || $test_data[0]['state'] != 'NY') {
+  $test_data = cd_sunlight_api_lookup('districts.getDistrictsFromZip', array('zip' => '94111'));
+  if ($test_data == FALSE || !isset($test_data[0]['state']) || $test_data[0]['state'] != 'CA') {
     return FALSE;
   }
   return TRUE;
