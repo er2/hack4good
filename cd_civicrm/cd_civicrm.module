@@ -564,7 +564,7 @@ function _cd_civicrm_contacts_geocode() {
   }
   elseif (empty($response->code)) {
     watchdog('cd_civicrm', 'Error during contact geocoding.  There was likely a timeout.  You ' .
-      'may need to decrease the cron contact limit.', WATCHDOG_ERROR);
+      'may need to decrease the cron contact limit.', array(), WATCHDOG_ERROR);
   }
   else {
 

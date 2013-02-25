@@ -85,7 +85,7 @@ function cd_sunlight_menu() {
     if ($congress_view->type == t('Overridden')) {
       watchdog('cd_sunlight', 'The "congress" view has been overridden.  The Congress Search form ' .
         'depends on the default arguments to create its results.  If you have modified the ' .
-        'arguments, the search form might not display correct results.', WATCHDOG_WARNING);
+        'arguments, the search form might not display correct results.', array(), WATCHDOG_WARNING);
     }
     $items['congress-search'] = array(
       'title' => 'Search for members of Congress',
@@ -343,8 +343,7 @@ function cd_sunlight_api_lookup($method, $params, &$error_message = '') {
 
   // Sanity checking.
   if (!is_array($params) || !count($params)) {
-    $error_message = 'Attempting to query Sunlight with no params. ';
-    watchdog('cd_sunlight', '@error_message', array('@error_message' => $error_message),
+    watchdog('cd_sunlight', 'Attempting to query Sunlight with no params. ', array(),
       WATCHDOG_ERROR);
     return FALSE;
   }
@@ -377,8 +376,7 @@ function cd_sunlight_api_lookup($method, $params, &$error_message = '') {
   // Parse the JSON.
   $result = json_decode($response->data, TRUE);
   if (empty($result)) {
-    $error_message = 'Sunlight did not return JSON data. ';
-    watchdog('cd_sunlight', '@error_message', array('@error_message' => $error_message),
+    watchdog('cd_sunlight', 'Sunlight did not return JSON data. ', array(),
       WATCHDOG_ERROR);
     return FALSE;
   }
