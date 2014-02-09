@@ -68,6 +68,9 @@ cd_sunlight_bioguide_image_url($bioguide_id)
 Advomatic LLC
 http://advomatic.com
 
+PurpleMarker
+https://geekli.st/hackathon/52c49d837689332d5f000019/project/52f5a474f9f1474d002fa29c
+https://github.com/er2/hack4good
 
 
 ** SPONSORED BY **
