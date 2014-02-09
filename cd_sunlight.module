@@ -500,6 +500,47 @@ function cd_sunlight_api_lookup_contact($contact) {
   return $cd_data;
 }
 
+/*
+* lookup congressional districts of sponsors of a given bill
+* @param $bill bill_id i.e. hr3590-111
+*/
+function cd_sunlight_api_lookup_bill_sponsor_cd($bill) {
+$params = new array(
+'bill_id'=> $bill
+);
+//https://congress.api.sunlightfoundation.com/bills?bill_id=hjres106-113&apikey=bfa7052e65b14e4dab4f144bb7a8e588
+$cd_data = sunlight api lookup('bills', $params);
+
+$sponsors = new array(
+'bioguide_id' => $cd_data['sponsor_id']
+);
+foreach($cd_data['cosponsor_ids'] as $cosponsor_id) {
+	///https://congress.api.sunlightfoundation.com/legislators?bioguide_id=R000395&apikey=bfa7052e65b14e4dab4f144bb7a8e588
+	$params = new array(
+		'bioguide_id' => $cosponsor_id
+	);
+  //queying multiple legislators looks like this, doesn't look like it's supported by sunlight_api_lookup()
+  //https://congress.api.sunlightfoundation.com/legislators?bioguide_id__in=B001289|S001195&apikey=bfa7052e65b14e4dab4f144bb7a8e588
+	$cd_data=sunlight api lookup('legislators', $params);
+	array_push(&$districts, _cd_sunlight_build_cd($cd_data['state'], $cd_data['district']) );
+
+	//foreach($sponsors) {
+	//$districts += _cd_sunlight_build_cd($sponsor['state'], $sponsor['district']);
+	//$district = new array(
+	//'districts' => $sponsor['district'];
+	//'state' => $sponsor['state'];
+	//);
+	//$districts += $district;
+
+}
+return $districts;
+}
+
+/*
+* get contacts in the given districts
+*/
+//function 
+
 /**
  *  @category INTERNAL PRIVATE FUNCTIONS
  */
